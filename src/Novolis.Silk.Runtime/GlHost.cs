@@ -106,6 +106,10 @@ public sealed class GlHost : IDisposable
         _gl.Viewport(0, 0, (uint)_viewportWidth, (uint)_viewportHeight);
     }
 
+    /// <summary>Binds a draw framebuffer (Avalonia FBO).</summary>
+    public void BindFramebuffer(int framebuffer) =>
+        _gl.BindFramebuffer(FramebufferTarget.Framebuffer, (uint)framebuffer);
+
     /// <summary>Clears and draws a tessellated planar frame.</summary>
     public void Submit(PlanarDrawList list)
     {

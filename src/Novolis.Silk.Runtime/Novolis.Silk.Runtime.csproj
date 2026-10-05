@@ -8,12 +8,26 @@
   </PropertyGroup>
   <ItemGroup>
     <LibraryReference Include="Novolis.Math.Geometry" />
-    <PackageReference Include="Silk.NET.GLFW" />
-    <PackageReference Include="Silk.NET.Input" />
-    <PackageReference Include="Silk.NET.Input.Common" />
-    <PackageReference Include="Silk.NET.Input.Glfw" />
-    <PackageReference Include="Silk.NET.OpenGL" />
-    <PackageReference Include="Silk.NET.Windowing" />
-    <PackageReference Include="Silk.NET.Windowing.Glfw" />
+    <PackageReference Include="Silk.NET.GLFW">
+      <PrivateAssets>compile</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Silk.NET.Input">
+      <PrivateAssets>compile</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Silk.NET.Input.Common">
+      <PrivateAssets>compile</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Silk.NET.Input.Glfw">
+      <PrivateAssets>compile</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Silk.NET.OpenGL">
+      <PrivateAssets>compile</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Silk.NET.Windowing">
+      <PrivateAssets>compile</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Silk.NET.Windowing.Glfw">
+      <PrivateAssets>compile</PrivateAssets>
+    </PackageReference>
   </ItemGroup>
 </Project>

@@ -8,8 +8,14 @@
   </PropertyGroup>
   <ItemGroup>
     <LibraryReference Include="Novolis.Math.Geometry" />
-    <PackageReference Include="Silk.NET.Vulkan" />
-    <PackageReference Include="Silk.NET.Shaderc" />
-    <PackageReference Include="Silk.NET.Shaderc.Native" />
+    <PackageReference Include="Silk.NET.Vulkan">
+      <PrivateAssets>compile</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Silk.NET.Shaderc">
+      <PrivateAssets>compile</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Silk.NET.Shaderc.Native">
+      <PrivateAssets>compile</PrivateAssets>
+    </PackageReference>
   </ItemGroup>
 </Project>

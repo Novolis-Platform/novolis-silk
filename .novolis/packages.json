@@ -1,18 +1,19 @@
 {
   "packages": {
     "Novolis.Silk": {
-      "paths": [
-        "src/Novolis.Silk/**",
-        "src/Novolis.Silk.Runtime/**",
-        "src/Novolis.Silk.Game/**",
-        "src/Novolis.Silk.Capture/**",
-        "src/Novolis.Silk.Compute/**",
-        "tests/**",
-        "Directory.Build.props",
-        "Directory.Packages.props",
-        "global.json"
-      ],
-      "project": "src/Novolis.Silk/Novolis.Silk.csproj"
+      "description": "Meta; pins Silk.NET 2.23.0 transitively. Does not reference Rendering."
+    },
+    "Novolis.Silk.Runtime": {
+      "description": "GLFW window, GL 3.3, input, planar Submit, and CPU Blit."
+    },
+    "Novolis.Silk.Game": {
+      "description": "Jam loop Run(title, size, update) with no scene types."
+    },
+    "Novolis.Silk.Capture": {
+      "description": "FBO readback to Rgba32 pixels."
+    },
+    "Novolis.Silk.Compute": {
+      "description": "Shaderc GLSL compile over BCL buffers."
     }
   }
 }

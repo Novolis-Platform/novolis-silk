@@ -32,11 +32,17 @@ public sealed class SilkFrame
     /// <summary>Elapsed seconds since the previous frame.</summary>
     public float DeltaSeconds => _dt;
 
+    /// <summary>Cursor in window pixels.</summary>
+    public Vector2 MousePosition => _mousePosition;
+
     /// <summary>Cursor X in window pixels.</summary>
     public float MouseX => _mousePosition.X;
 
     /// <summary>Cursor Y in window pixels.</summary>
     public float MouseY => _mousePosition.Y;
+
+    /// <summary>Cursor delta this frame.</summary>
+    public Vector2 MouseDelta => _mouseDelta;
 
     /// <summary>Cursor delta X this frame.</summary>
     public float MouseDeltaX => _mouseDelta.X;
