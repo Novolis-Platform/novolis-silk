@@ -83,6 +83,9 @@ public sealed class SilkFrame
         }
     }
 
+    /// <summary>Closes the window after the current frame.</summary>
+    public void Close() => _window?.Close();
+
     /// <summary>Draws a tessellated planar frame.</summary>
     public void Submit(PlanarDrawList list) => Host.Submit(list);
 
