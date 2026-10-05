@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Novolis.Silk.Game</PackageId>
+    <RootNamespace>Novolis.Silk</RootNamespace>
+    <AssemblyName>Novolis.Silk.Game</AssemblyName>
+    <IsPackable>true</IsPackable>
+    <Description>Jam loop for Novolis.Silk — Run(title, size, update) with no scene types.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Novolis.Silk.Runtime\Novolis.Silk.Runtime.csproj" />
+    <ProjectReference Include="..\Novolis.Silk.Capture\Novolis.Silk.Capture.csproj" />
+  </ItemGroup>
+</Project>

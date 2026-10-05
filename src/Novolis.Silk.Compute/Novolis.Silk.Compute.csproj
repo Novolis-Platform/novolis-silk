@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Novolis.Silk.Compute</PackageId>
+    <RootNamespace>Novolis.Silk.Compute</RootNamespace>
+    <AssemblyName>Novolis.Silk.Compute</AssemblyName>
+    <IsPackable>true</IsPackable>
+    <Description>Silk.NET Vulkan + Shaderc compute helpers over BCL/Math buffers. Does not reference Novolis.Rendering.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <LibraryReference Include="Novolis.Math.Geometry" />
+    <PackageReference Include="Silk.NET.Vulkan" />
+    <PackageReference Include="Silk.NET.Shaderc" />
+    <PackageReference Include="Silk.NET.Shaderc.Native" />
+  </ItemGroup>
+</Project>

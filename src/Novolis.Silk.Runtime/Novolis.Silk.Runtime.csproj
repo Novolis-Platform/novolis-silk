@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Novolis.Silk.Runtime</PackageId>
+    <RootNamespace>Novolis.Silk</RootNamespace>
+    <AssemblyName>Novolis.Silk.Runtime</AssemblyName>
+    <IsPackable>true</IsPackable>
+    <Description>Silk.NET window, OpenGL context, input, planar quad batch, and CPU-pixel blit. The only Novolis assembly that references Silk.NET OpenGL/windowing.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <LibraryReference Include="Novolis.Math.Geometry" />
+    <PackageReference Include="Silk.NET.GLFW" />
+    <PackageReference Include="Silk.NET.Input" />
+    <PackageReference Include="Silk.NET.Input.Common" />
+    <PackageReference Include="Silk.NET.Input.Glfw" />
+    <PackageReference Include="Silk.NET.OpenGL" />
+    <PackageReference Include="Silk.NET.Windowing" />
+    <PackageReference Include="Silk.NET.Windowing.Glfw" />
+  </ItemGroup>
+</Project>

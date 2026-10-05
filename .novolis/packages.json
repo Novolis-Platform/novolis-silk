@@ -1,0 +1,18 @@
+{
+  "packages": {
+    "Novolis.Silk": {
+      "paths": [
+        "src/Novolis.Silk/**",
+        "src/Novolis.Silk.Runtime/**",
+        "src/Novolis.Silk.Game/**",
+        "src/Novolis.Silk.Capture/**",
+        "src/Novolis.Silk.Compute/**",
+        "tests/**",
+        "Directory.Build.props",
+        "Directory.Packages.props",
+        "global.json"
+      ],
+      "project": "src/Novolis.Silk/Novolis.Silk.csproj"
+    }
+  }
+}

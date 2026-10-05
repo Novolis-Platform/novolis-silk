@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Novolis.Silk</PackageId>
+    <RootNamespace>Novolis.Silk</RootNamespace>
+    <AssemblyName>Novolis.Silk</AssemblyName>
+    <IsPackable>true</IsPackable>
+    <Description>Novolis Silk — one install for GLFW/OpenGL hosts. Pins Silk.NET transitively. Does not reference Rendering.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Novolis.Silk.Runtime\Novolis.Silk.Runtime.csproj" />
+    <ProjectReference Include="..\Novolis.Silk.Game\Novolis.Silk.Game.csproj" />
+    <ProjectReference Include="..\Novolis.Silk.Capture\Novolis.Silk.Capture.csproj" />
+    <ProjectReference Include="..\Novolis.Silk.Compute\Novolis.Silk.Compute.csproj" />
+  </ItemGroup>
+</Project>

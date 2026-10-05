@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Novolis.Silk/Novolis.Silk.csproj" />
+    <Project Path="src/Novolis.Silk.Runtime/Novolis.Silk.Runtime.csproj" />
+    <Project Path="src/Novolis.Silk.Game/Novolis.Silk.Game.csproj" />
+    <Project Path="src/Novolis.Silk.Capture/Novolis.Silk.Capture.csproj" />
+    <Project Path="src/Novolis.Silk.Compute/Novolis.Silk.Compute.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Novolis.Silk.Unit/Novolis.Silk.Unit.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Novolis.Silk.Capture</PackageId>
+    <RootNamespace>Novolis.Silk.Capture</RootNamespace>
+    <AssemblyName>Novolis.Silk.Capture</AssemblyName>
+    <IsPackable>true</IsPackable>
+    <Description>OpenGL framebuffer readback for Novolis.Silk hosts (Rgba32 pixels).</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Novolis.Silk.Runtime\Novolis.Silk.Runtime.csproj" />
+  </ItemGroup>
+</Project>
