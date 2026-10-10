@@ -7,7 +7,7 @@ Closed Silk island: GLFW / OpenGL / Vulkan-compute helpers. Published docs: [htt
 - Only this repo may `PackageReference` `Silk.NET.*` or `using Silk.NET.*`.
 - Silk ↛ Rendering and Rendering ↛ `Novolis.Silk` / `Silk.NET`.
 - Handshake is Math/BCL: `PlanarDrawList`, `PlanarVertex`, `Rgba32`, UV floats. No `ITwoDRenderer` here.
-- Apps, labs, and `Novolis.Avalonia.*` compose Silk + Rendering. `Novolis.Game.*` takes neither (same as Raylib / NOV2009).
+- GAME (apps/labs) and `Novolis.Avalonia.*` compose Silk + Gaming. `Novolis.Game.*` may take Rendering; it must not take Silk (`NOV2017`) or Raylib (`NOV2009`).
 - No `Novolis.Rendering.*.Silk` package ids. Raylib’s `Presentation.Raylib` stays as-is.
 
 ## Packages

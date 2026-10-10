@@ -19,7 +19,7 @@ dotnet add package Novolis.Silk
 - Only `novolis-silk` may `PackageReference` `Silk.NET.*` or `using Silk.NET.*`.
 - Silk ↛ Rendering and Rendering ↛ `Novolis.Silk` / `Silk.NET`.
 - Handshake is Math/BCL: `PlanarDrawList`, `Rgba32`, UV floats.
-- Apps, labs, and `Novolis.Avalonia.*` compose Silk + Rendering. `Novolis.Game.*` takes neither.
+- GAME (apps/labs) and `Novolis.Avalonia.*` compose Silk + Gaming. `Novolis.Game.*` may take Rendering; it must not take Silk.
 
 ## Quick start
 
