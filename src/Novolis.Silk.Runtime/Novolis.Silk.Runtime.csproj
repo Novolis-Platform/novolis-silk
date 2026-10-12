@@ -26,6 +26,7 @@
     <PackageReference Include="Silk.NET.Windowing">
       <PrivateAssets>compile</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="Silk.NET.Windowing.Sdl" />
     <PackageReference Include="Silk.NET.Windowing.Glfw">
       <PrivateAssets>compile</PrivateAssets>
     </PackageReference>
