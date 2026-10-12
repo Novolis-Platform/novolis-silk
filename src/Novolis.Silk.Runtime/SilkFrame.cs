@@ -32,7 +32,7 @@ public sealed class SilkFrame
     /// <summary>Elapsed seconds since the previous frame.</summary>
     public float DeltaSeconds => _dt;
 
-    /// <summary>Cursor in window pixels.</summary>
+    /// <summary>Cursor in framebuffer pixels, matching <see cref="Width"/> and <see cref="Height"/>.</summary>
     public Vector2 MousePosition => _mousePosition;
 
     /// <summary>Cursor X in window pixels.</summary>
@@ -188,10 +188,13 @@ public sealed class SilkFrame
     {
         _mouseDelta = Vector2.Zero;
         _scrollDelta = 0f;
+        var windowSize = _window?.Size ?? new Vector2D<int>(_width, _height);
+        var scaleX = windowSize.X > 0 ? _width / (float)windowSize.X : 1f;
+        var scaleY = windowSize.Y > 0 ? _height / (float)windowSize.Y : 1f;
         foreach (var mouse in _input?.Mice ?? [])
         {
             var p = mouse.Position;
-            var pos = new Vector2(p.X, p.Y);
+            var pos = new Vector2(p.X * scaleX, p.Y * scaleY);
             _mouseDelta += pos - _mousePosition;
             _mousePosition = pos;
             foreach (var scroll in mouse.ScrollWheels)

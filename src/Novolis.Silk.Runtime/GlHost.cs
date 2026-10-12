@@ -71,6 +71,9 @@ public sealed class GlHost : IDisposable
     private uint _blitVao;
     private uint _blitVbo;
     private uint _blitTexture;
+    private int _mvpLocation;
+    private int _textureLocation;
+    private int _useTextureLocation;
     private int _viewportWidth;
     private int _viewportHeight;
     private bool _initialized;
@@ -250,18 +253,17 @@ public sealed class GlHost : IDisposable
         _gl.UseProgram(_program);
         unsafe
         {
-            var loc = _gl.GetUniformLocation(_program, "uMvp");
-            _gl.UniformMatrix4(loc, 1, false, (float*)&mvp);
+            _gl.UniformMatrix4(_mvpLocation, 1, false, (float*)&mvp);
         }
 
         uint glTex = 0;
         var useTexture = textureId > 0 && _gpuTextures.TryGetValue(textureId, out glTex);
-        _gl.Uniform1(_gl.GetUniformLocation(_program, "uUseTexture"), useTexture ? 1f : 0f);
+        _gl.Uniform1(_useTextureLocation, useTexture ? 1f : 0f);
         if (useTexture)
         {
             _gl.ActiveTexture(TextureUnit.Texture0);
             _gl.BindTexture(TextureTarget.Texture2D, glTex);
-            _gl.Uniform1(_gl.GetUniformLocation(_program, "uTexture"), 0);
+            _gl.Uniform1(_textureLocation, 0);
         }
 
         _gl.BindVertexArray(_vao);
@@ -363,6 +365,9 @@ public sealed class GlHost : IDisposable
         }
 
         _program = CompileProgram(VertexShaderSource, FragmentShaderSource);
+        _mvpLocation = _gl.GetUniformLocation(_program, "uMvp");
+        _textureLocation = _gl.GetUniformLocation(_program, "uTexture");
+        _useTextureLocation = _gl.GetUniformLocation(_program, "uUseTexture");
         _vao = _gl.GenVertexArray();
         _vbo = _gl.GenBuffer();
         _gl.BindVertexArray(_vao);
