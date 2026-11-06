@@ -11,8 +11,14 @@ public enum Key
     /// <summary>Space bar.</summary>
     Space = 32,
 
+    /// <summary>Comma.</summary>
+    Comma = 44,
+
     /// <summary>Minus / hyphen.</summary>
     Minus = 45,
+
+    /// <summary>Period.</summary>
+    Period = 46,
 
     /// <summary>Digit 1.</summary>
     Number1 = 49,
@@ -38,6 +44,9 @@ public enum Key
     /// <summary>B key.</summary>
     B = 66,
 
+    /// <summary>C key.</summary>
+    C = 67,
+
     /// <summary>D key.</summary>
     D = 68,
 
@@ -59,6 +68,12 @@ public enum Key
     /// <summary>K key.</summary>
     K = 75,
 
+    /// <summary>M key.</summary>
+    M = 77,
+
+    /// <summary>N key.</summary>
+    N = 78,
+
     /// <summary>O key.</summary>
     O = 79,
 
@@ -79,6 +94,9 @@ public enum Key
 
     /// <summary>U key.</summary>
     U = 85,
+
+    /// <summary>V key.</summary>
+    V = 86,
 
     /// <summary>W key.</summary>
     W = 87,
