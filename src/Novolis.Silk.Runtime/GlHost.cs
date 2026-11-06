@@ -240,6 +240,8 @@ public sealed class GlHost : IDisposable
         _gl.Enable(EnableCap.Blend);
         _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
         _gl.UseProgram(_worldLineProgram);
+        // Numerics row-major memory + GL transpose=false already matches GLSL column-vector mul
+        // (same convention as planar Submit). Do not Transpose() here — that fans the mesh to a point.
         var mvp = viewProjection;
         unsafe
         {
