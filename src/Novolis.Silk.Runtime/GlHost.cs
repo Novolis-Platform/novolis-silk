@@ -61,19 +61,46 @@ public sealed class GlHost : IDisposable
         }
         """;
 
+    private const string WorldLineVertexSource = """
+        #version 330 core
+        layout (location = 0) in vec3 aPos;
+        layout (location = 1) in vec4 aColor;
+        uniform mat4 uMvp;
+        out vec4 vColor;
+        void main()
+        {
+            gl_Position = uMvp * vec4(aPos, 1.0);
+            vColor = aColor;
+        }
+        """;
+
+    private const string WorldLineFragmentSource = """
+        #version 330 core
+        in vec4 vColor;
+        out vec4 FragColor;
+        void main()
+        {
+            FragColor = vColor;
+        }
+        """;
+
     private readonly GL _gl;
     private readonly Dictionary<int, uint> _gpuTextures = new();
     private readonly List<GpuVertex> _batch = new(4096);
     private uint _program;
     private uint _blitProgram;
+    private uint _worldLineProgram;
     private uint _vao;
     private uint _vbo;
     private uint _blitVao;
     private uint _blitVbo;
     private uint _blitTexture;
+    private uint _worldLineVao;
+    private uint _worldLineVbo;
     private int _mvpLocation;
     private int _textureLocation;
     private int _useTextureLocation;
+    private int _worldLineMvpLocation;
     private int _viewportWidth;
     private int _viewportHeight;
     private bool _initialized;
@@ -167,6 +194,72 @@ public sealed class GlHost : IDisposable
         _gl.BindVertexArray(0);
     }
 
+    /// <summary>Clears the color (and optional depth) buffer.</summary>
+    public void Clear(Rgba32 color, bool depth = true)
+    {
+        EnsureInitialized();
+        _gl.ClearColor(color.R / 255f, color.G / 255f, color.B / 255f, color.A / 255f);
+        var mask = ClearBufferMask.ColorBufferBit;
+        if (depth)
+        {
+            _gl.ClearDepth(1.0);
+            mask |= ClearBufferMask.DepthBufferBit;
+        }
+
+        _gl.Clear(mask);
+    }
+
+    /// <summary>
+    /// Draws world-space line segments (pairs of <see cref="WorldLineVertex"/>) with a view-projection matrix.
+    /// Math/BCL handshake only — no Rendering types.
+    /// </summary>
+    public void DrawWorldLines(ReadOnlySpan<WorldLineVertex> vertices, in Matrix4x4 viewProjection)
+    {
+        if (vertices.Length < 2)
+            return;
+
+        EnsureInitialized();
+        var count = vertices.Length - (vertices.Length & 1);
+        var floats = new float[count * 7];
+        for (var i = 0; i < count; i++)
+        {
+            var v = vertices[i];
+            var o = i * 7;
+            floats[o] = v.X;
+            floats[o + 1] = v.Y;
+            floats[o + 2] = v.Z;
+            floats[o + 3] = v.Color.R / 255f;
+            floats[o + 4] = v.Color.G / 255f;
+            floats[o + 5] = v.Color.B / 255f;
+            floats[o + 6] = v.Color.A / 255f;
+        }
+
+        _gl.Enable(EnableCap.DepthTest);
+        _gl.DepthFunc(DepthFunction.Less);
+        _gl.Disable(EnableCap.CullFace);
+        _gl.Enable(EnableCap.Blend);
+        _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+        _gl.UseProgram(_worldLineProgram);
+        var mvp = viewProjection;
+        unsafe
+        {
+            _gl.UniformMatrix4(_worldLineMvpLocation, 1, false, (float*)&mvp);
+            fixed (float* ptr = floats)
+            {
+                _gl.BindVertexArray(_worldLineVao);
+                _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _worldLineVbo);
+                _gl.BufferData(
+                    BufferTargetARB.ArrayBuffer,
+                    (nuint)(floats.Length * sizeof(float)),
+                    ptr,
+                    BufferUsageARB.StreamDraw);
+            }
+        }
+
+        _gl.DrawArrays(PrimitiveType.Lines, 0, (uint)count);
+        _gl.BindVertexArray(0);
+    }
+
     /// <summary>Reads the current framebuffer as top-left origin RGBA.</summary>
     public bool TryReadPixels(out Rgba32[] pixels)
     {
@@ -230,6 +323,9 @@ public sealed class GlHost : IDisposable
         _gl.DeleteBuffer(_blitVbo);
         _gl.DeleteVertexArray(_blitVao);
         _gl.DeleteProgram(_blitProgram);
+        _gl.DeleteBuffer(_worldLineVbo);
+        _gl.DeleteVertexArray(_worldLineVao);
+        _gl.DeleteProgram(_worldLineProgram);
     }
 
     private void AddVertex(PlanarVertex v) =>
@@ -406,6 +502,18 @@ public sealed class GlHost : IDisposable
         _gl.VertexAttribPointer(0, 2, VertexAttribPointerType.Float, false, 4 * sizeof(float), 0);
         _gl.EnableVertexAttribArray(1);
         _gl.VertexAttribPointer(1, 2, VertexAttribPointerType.Float, false, 4 * sizeof(float), 2 * sizeof(float));
+
+        _worldLineProgram = CompileProgram(WorldLineVertexSource, WorldLineFragmentSource);
+        _worldLineMvpLocation = _gl.GetUniformLocation(_worldLineProgram, "uMvp");
+        _worldLineVao = _gl.GenVertexArray();
+        _worldLineVbo = _gl.GenBuffer();
+        _gl.BindVertexArray(_worldLineVao);
+        _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _worldLineVbo);
+        var lineStride = 7 * sizeof(float);
+        _gl.EnableVertexAttribArray(0);
+        _gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, (uint)lineStride, 0);
+        _gl.EnableVertexAttribArray(1);
+        _gl.VertexAttribPointer(1, 4, VertexAttribPointerType.Float, false, (uint)lineStride, 3 * sizeof(float));
         _gl.BindVertexArray(0);
         _initialized = true;
     }

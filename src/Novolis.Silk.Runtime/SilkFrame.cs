@@ -92,6 +92,13 @@ public sealed class SilkFrame
     /// <summary>Blits CPU RGBA pixels to the window.</summary>
     public void Blit(ReadOnlySpan<Rgba32> pixels, int width, int height) => Host.Blit(pixels, width, height);
 
+    /// <summary>Clears the framebuffer.</summary>
+    public void Clear(Rgba32 color, bool depth = true) => Host.Clear(color, depth);
+
+    /// <summary>Draws world-space line pairs with a view-projection matrix.</summary>
+    public void DrawWorldLines(ReadOnlySpan<WorldLineVertex> vertices, in Matrix4x4 viewProjection) =>
+        Host.DrawWorldLines(vertices, viewProjection);
+
     /// <summary>Whether <paramref name="key"/> is held.</summary>
     public bool IsKeyDown(Key key)
     {
