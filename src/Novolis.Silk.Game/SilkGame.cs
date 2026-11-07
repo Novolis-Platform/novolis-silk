@@ -26,7 +26,19 @@ public static class SilkGame
         Action<SilkFrame>? initialize,
         Action<SilkFrame> update,
         Action<SilkFrame>? renderOverlay,
-        FrameCaptureSession? captureSession)
+        FrameCaptureSession? captureSession) =>
+        Run(title, width, height, initialize, update, renderOverlay, captureSession, visible: true);
+
+    /// <summary>Runs a GLFW/OpenGL loop; <paramref name="visible"/> false for headless PNG capture.</summary>
+    public static void Run(
+        string title,
+        int width,
+        int height,
+        Action<SilkFrame>? initialize,
+        Action<SilkFrame> update,
+        Action<SilkFrame>? renderOverlay,
+        FrameCaptureSession? captureSession,
+        bool visible)
     {
         ArgumentNullException.ThrowIfNull(update);
         SilkWindow.Run(
@@ -39,6 +51,7 @@ public static class SilkGame
                 update(frame);
                 renderOverlay?.Invoke(frame);
                 captureSession?.CaptureAfterDraw(frame.Host);
-            });
+            },
+            visible);
     }
 }

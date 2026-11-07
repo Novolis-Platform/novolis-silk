@@ -90,6 +90,7 @@ public sealed class GlHost : IDisposable
     private uint _program;
     private uint _blitProgram;
     private uint _worldLineProgram;
+    private uint _worldSolidProgram;
     private uint _vao;
     private uint _vbo;
     private uint _blitVao;
@@ -97,10 +98,13 @@ public sealed class GlHost : IDisposable
     private uint _blitTexture;
     private uint _worldLineVao;
     private uint _worldLineVbo;
+    private uint _worldSolidVao;
+    private uint _worldSolidVbo;
     private int _mvpLocation;
     private int _textureLocation;
     private int _useTextureLocation;
     private int _worldLineMvpLocation;
+    private int _worldSolidMvpLocation;
     private int _viewportWidth;
     private int _viewportHeight;
     private bool _initialized;
@@ -262,6 +266,59 @@ public sealed class GlHost : IDisposable
         _gl.BindVertexArray(0);
     }
 
+    /// <summary>
+    /// Draws world-space triangles (groups of 3 <see cref="WorldSolidVertex"/>) with a view-projection matrix.
+    /// Math/BCL handshake only — no Rendering types.
+    /// </summary>
+    public void DrawWorldTriangles(ReadOnlySpan<WorldSolidVertex> vertices, in Matrix4x4 viewProjection)
+    {
+        if (vertices.Length < 3)
+            return;
+
+        EnsureInitialized();
+        var count = vertices.Length - (vertices.Length % 3);
+        var floats = new float[count * 7];
+        for (var i = 0; i < count; i++)
+        {
+            var v = vertices[i];
+            var o = i * 7;
+            floats[o] = v.X;
+            floats[o + 1] = v.Y;
+            floats[o + 2] = v.Z;
+            floats[o + 3] = v.Color.R / 255f;
+            floats[o + 4] = v.Color.G / 255f;
+            floats[o + 5] = v.Color.B / 255f;
+            floats[o + 6] = v.Color.A / 255f;
+        }
+
+        _gl.Enable(EnableCap.DepthTest);
+        _gl.DepthFunc(DepthFunction.Less);
+        _gl.Enable(EnableCap.CullFace);
+        _gl.CullFace(TriangleFace.Back);
+        _gl.Enable(EnableCap.Blend);
+        _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+        _gl.UseProgram(_worldSolidProgram);
+        var mvp = viewProjection;
+        unsafe
+        {
+            _gl.UniformMatrix4(_worldSolidMvpLocation, 1, false, (float*)&mvp);
+            fixed (float* ptr = floats)
+            {
+                _gl.BindVertexArray(_worldSolidVao);
+                _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _worldSolidVbo);
+                _gl.BufferData(
+                    BufferTargetARB.ArrayBuffer,
+                    (nuint)(floats.Length * sizeof(float)),
+                    ptr,
+                    BufferUsageARB.StreamDraw);
+            }
+        }
+
+        _gl.DrawArrays(PrimitiveType.Triangles, 0, (uint)count);
+        _gl.BindVertexArray(0);
+        _gl.Disable(EnableCap.CullFace);
+    }
+
     /// <summary>Reads the current framebuffer as top-left origin RGBA.</summary>
     public bool TryReadPixels(out Rgba32[] pixels)
     {
@@ -328,6 +385,9 @@ public sealed class GlHost : IDisposable
         _gl.DeleteBuffer(_worldLineVbo);
         _gl.DeleteVertexArray(_worldLineVao);
         _gl.DeleteProgram(_worldLineProgram);
+        _gl.DeleteBuffer(_worldSolidVbo);
+        _gl.DeleteVertexArray(_worldSolidVao);
+        _gl.DeleteProgram(_worldSolidProgram);
     }
 
     private void AddVertex(PlanarVertex v) =>
@@ -512,6 +572,18 @@ public sealed class GlHost : IDisposable
         _gl.BindVertexArray(_worldLineVao);
         _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _worldLineVbo);
         var lineStride = 7 * sizeof(float);
+        _gl.EnableVertexAttribArray(0);
+        _gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, (uint)lineStride, 0);
+        _gl.EnableVertexAttribArray(1);
+        _gl.VertexAttribPointer(1, 4, VertexAttribPointerType.Float, false, (uint)lineStride, 3 * sizeof(float));
+
+        // Same vertex layout/shaders as world lines — triangles instead of lines.
+        _worldSolidProgram = CompileProgram(WorldLineVertexSource, WorldLineFragmentSource);
+        _worldSolidMvpLocation = _gl.GetUniformLocation(_worldSolidProgram, "uMvp");
+        _worldSolidVao = _gl.GenVertexArray();
+        _worldSolidVbo = _gl.GenBuffer();
+        _gl.BindVertexArray(_worldSolidVao);
+        _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _worldSolidVbo);
         _gl.EnableVertexAttribArray(0);
         _gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, (uint)lineStride, 0);
         _gl.EnableVertexAttribArray(1);

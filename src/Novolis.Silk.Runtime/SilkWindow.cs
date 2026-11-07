@@ -15,19 +15,30 @@ public static class SilkWindow
         int width,
         int height,
         Action<SilkFrame>? initialize,
-        Action<SilkFrame> update)
+        Action<SilkFrame> update) =>
+        Run(title, width, height, initialize, update, visible: true);
+
+    /// <summary>Runs a GLFW/OpenGL loop; set <paramref name="visible"/> false for headless capture.</summary>
+    public static void Run(
+        string title,
+        int width,
+        int height,
+        Action<SilkFrame>? initialize,
+        Action<SilkFrame> update,
+        bool visible)
     {
         ArgumentNullException.ThrowIfNull(update);
         var options = WindowOptions.Default with
         {
             Title = title,
             Size = new Vector2D<int>(width, height),
+            IsVisible = visible,
             API = new GraphicsAPI(
                 ContextAPI.OpenGL,
                 ContextProfile.Core,
                 ContextFlags.ForwardCompatible,
                 new APIVersion(3, 3)),
-            VSync = true,
+            VSync = visible,
         };
 
         GlfwWindowing.RegisterPlatform();

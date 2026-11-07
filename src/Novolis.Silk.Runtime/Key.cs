@@ -62,11 +62,17 @@ public enum Key
     /// <summary>H key.</summary>
     H = 72,
 
+    /// <summary>I key.</summary>
+    I = 73,
+
     /// <summary>J key.</summary>
     J = 74,
 
     /// <summary>K key.</summary>
     K = 75,
+
+    /// <summary>L key.</summary>
+    L = 76,
 
     /// <summary>M key.</summary>
     M = 77,

@@ -99,6 +99,30 @@ public sealed class SilkFrame
     public void DrawWorldLines(ReadOnlySpan<WorldLineVertex> vertices, in Matrix4x4 viewProjection) =>
         Host.DrawWorldLines(vertices, viewProjection);
 
+    /// <summary>Draws world-space triangles with a view-projection matrix.</summary>
+    public void DrawWorldTriangles(ReadOnlySpan<WorldSolidVertex> vertices, in Matrix4x4 viewProjection) =>
+        Host.DrawWorldTriangles(vertices, viewProjection);
+
+    /// <summary>Submits a <see cref="WorldSolidBatch"/> (triangles then lines).</summary>
+    public void SubmitWorld(WorldSolidBatch batch, in Matrix4x4 viewProjection)
+    {
+        ArgumentNullException.ThrowIfNull(batch);
+        var tris = batch.Triangles;
+        if (tris.Length >= 3)
+            DrawWorldTriangles(tris, viewProjection);
+        var lines = batch.Lines;
+        if (lines.Length >= 2)
+            DrawWorldLines(lines, viewProjection);
+    }
+
+    /// <summary>Draws one axis-aligned cube.</summary>
+    public void DrawCube(Vector3 center, float width, float height, float length, Rgba32 color, in Matrix4x4 viewProjection)
+    {
+        var batch = new WorldSolidBatch();
+        batch.Cube(center, width, height, length, color);
+        DrawWorldTriangles(batch.Triangles, viewProjection);
+    }
+
     /// <summary>Whether <paramref name="key"/> is held.</summary>
     public bool IsKeyDown(Key key)
     {
