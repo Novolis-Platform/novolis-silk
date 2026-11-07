@@ -95,9 +95,17 @@ public sealed class SilkFrame
     /// <summary>Clears the framebuffer.</summary>
     public void Clear(Rgba32 color, bool depth = true) => Host.Clear(color, depth);
 
-    /// <summary>Draws world-space line pairs with a view-projection matrix.</summary>
+    /// <summary>Draws world-space line pairs with a view-projection matrix (streams each call).</summary>
     public void DrawWorldLines(ReadOnlySpan<WorldLineVertex> vertices, in Matrix4x4 viewProjection) =>
         Host.DrawWorldLines(vertices, viewProjection);
+
+    /// <summary>Uploads static world lines once; redraw with <see cref="DrawWorldLineMesh"/>.</summary>
+    public WorldLineGpuMesh CreateWorldLineMesh(ReadOnlySpan<WorldLineVertex> vertices) =>
+        Host.CreateWorldLineMesh(vertices);
+
+    /// <summary>Draws a GPU-resident world-line mesh (no per-frame upload).</summary>
+    public void DrawWorldLineMesh(WorldLineGpuMesh mesh, in Matrix4x4 viewProjection) =>
+        Host.DrawWorldLineMesh(mesh, viewProjection);
 
     /// <summary>Draws world-space triangles with a view-projection matrix.</summary>
     public void DrawWorldTriangles(ReadOnlySpan<WorldSolidVertex> vertices, in Matrix4x4 viewProjection) =>

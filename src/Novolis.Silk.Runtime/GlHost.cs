@@ -109,6 +109,10 @@ public sealed class GlHost : IDisposable
     private int _viewportHeight;
     private bool _initialized;
     private bool _disposed;
+    private float[] _worldLineScratch = [];
+    private float[] _worldSolidScratch = [];
+    private int _worldLineVboCapacityFloats;
+    private int _worldSolidVboCapacityFloats;
 
     /// <summary>Creates a host for an existing OpenGL context.</summary>
     /// <param name="gl">Active Silk GL API (kept inside this assembly).</param>
@@ -216,6 +220,7 @@ public sealed class GlHost : IDisposable
     /// <summary>
     /// Draws world-space line segments (pairs of <see cref="WorldLineVertex"/>) with a view-projection matrix.
     /// Math/BCL handshake only — no Rendering types.
+    /// Reuses a scratch buffer; still streams every call — prefer <see cref="CreateWorldLineMesh"/> for static geometry.
     /// </summary>
     public void DrawWorldLines(ReadOnlySpan<WorldLineVertex> vertices, in Matrix4x4 viewProjection)
     {
@@ -224,46 +229,65 @@ public sealed class GlHost : IDisposable
 
         EnsureInitialized();
         var count = vertices.Length - (vertices.Length & 1);
-        var floats = new float[count * 7];
-        for (var i = 0; i < count; i++)
-        {
-            var v = vertices[i];
-            var o = i * 7;
-            floats[o] = v.X;
-            floats[o + 1] = v.Y;
-            floats[o + 2] = v.Z;
-            floats[o + 3] = v.Color.R / 255f;
-            floats[o + 4] = v.Color.G / 255f;
-            floats[o + 5] = v.Color.B / 255f;
-            floats[o + 6] = v.Color.A / 255f;
-        }
-
-        _gl.Enable(EnableCap.DepthTest);
-        _gl.DepthFunc(DepthFunction.Less);
-        _gl.Disable(EnableCap.CullFace);
-        _gl.Enable(EnableCap.Blend);
-        _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
-        _gl.UseProgram(_worldLineProgram);
-        // Numerics row-major memory + GL transpose=false already matches GLSL column-vector mul
-        // (same convention as planar Submit). Do not Transpose() here — that fans the mesh to a point.
+        PackWorldVertices(vertices[..count], ref _worldLineScratch);
+        BindWorldLineState();
+        UploadStream(_worldLineVao, _worldLineVbo, _worldLineScratch.AsSpan(0, count * 7), ref _worldLineVboCapacityFloats);
         var mvp = viewProjection;
         unsafe
         {
             _gl.UniformMatrix4(_worldLineMvpLocation, 1, false, (float*)&mvp);
-            fixed (float* ptr = floats)
-            {
-                _gl.BindVertexArray(_worldLineVao);
-                _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _worldLineVbo);
-                _gl.BufferData(
-                    BufferTargetARB.ArrayBuffer,
-                    (nuint)(floats.Length * sizeof(float)),
-                    ptr,
-                    BufferUsageARB.StreamDraw);
-            }
         }
 
         _gl.DrawArrays(PrimitiveType.Lines, 0, (uint)count);
         _gl.BindVertexArray(0);
+    }
+
+    /// <summary>
+    /// Uploads line vertices once into a GPU mesh. Draw with <see cref="DrawWorldLineMesh"/> each frame.
+    /// </summary>
+    public WorldLineGpuMesh CreateWorldLineMesh(ReadOnlySpan<WorldLineVertex> vertices)
+    {
+        EnsureInitialized();
+        var count = vertices.Length - (vertices.Length & 1);
+        if (count < 2)
+            return new WorldLineGpuMesh(_gl, 0, 0, 0);
+
+        PackWorldVertices(vertices[..count], ref _worldLineScratch);
+        var vao = _gl.GenVertexArray();
+        var vbo = _gl.GenBuffer();
+        _gl.BindVertexArray(vao);
+        _gl.BindBuffer(BufferTargetARB.ArrayBuffer, vbo);
+        unsafe
+        {
+            fixed (float* ptr = _worldLineScratch)
+            {
+                _gl.BufferData(
+                    BufferTargetARB.ArrayBuffer,
+                    (nuint)(count * 7 * sizeof(float)),
+                    ptr,
+                    BufferUsageARB.StaticDraw);
+            }
+        }
+
+        var lineStride = 7 * sizeof(float);
+        _gl.EnableVertexAttribArray(0);
+        _gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, (uint)lineStride, 0);
+        _gl.EnableVertexAttribArray(1);
+        _gl.VertexAttribPointer(1, 4, VertexAttribPointerType.Float, false, (uint)lineStride, 3 * sizeof(float));
+        _gl.BindVertexArray(0);
+        return new WorldLineGpuMesh(_gl, vao, vbo, count);
+    }
+
+    /// <summary>Draws a previously uploaded <see cref="WorldLineGpuMesh"/> (no CPU→GPU copy).</summary>
+    public void DrawWorldLineMesh(WorldLineGpuMesh mesh, in Matrix4x4 viewProjection)
+    {
+        ArgumentNullException.ThrowIfNull(mesh);
+        if (mesh.VertexCount < 2)
+            return;
+
+        EnsureInitialized();
+        BindWorldLineState();
+        mesh.Draw(_worldLineProgram, _worldLineMvpLocation, viewProjection);
     }
 
     /// <summary>
@@ -277,20 +301,7 @@ public sealed class GlHost : IDisposable
 
         EnsureInitialized();
         var count = vertices.Length - (vertices.Length % 3);
-        var floats = new float[count * 7];
-        for (var i = 0; i < count; i++)
-        {
-            var v = vertices[i];
-            var o = i * 7;
-            floats[o] = v.X;
-            floats[o + 1] = v.Y;
-            floats[o + 2] = v.Z;
-            floats[o + 3] = v.Color.R / 255f;
-            floats[o + 4] = v.Color.G / 255f;
-            floats[o + 5] = v.Color.B / 255f;
-            floats[o + 6] = v.Color.A / 255f;
-        }
-
+        PackWorldVertices(vertices[..count], ref _worldSolidScratch);
         _gl.Enable(EnableCap.DepthTest);
         _gl.DepthFunc(DepthFunction.Less);
         _gl.Enable(EnableCap.CullFace);
@@ -298,20 +309,11 @@ public sealed class GlHost : IDisposable
         _gl.Enable(EnableCap.Blend);
         _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
         _gl.UseProgram(_worldSolidProgram);
+        UploadStream(_worldSolidVao, _worldSolidVbo, _worldSolidScratch.AsSpan(0, count * 7), ref _worldSolidVboCapacityFloats);
         var mvp = viewProjection;
         unsafe
         {
             _gl.UniformMatrix4(_worldSolidMvpLocation, 1, false, (float*)&mvp);
-            fixed (float* ptr = floats)
-            {
-                _gl.BindVertexArray(_worldSolidVao);
-                _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _worldSolidVbo);
-                _gl.BufferData(
-                    BufferTargetARB.ArrayBuffer,
-                    (nuint)(floats.Length * sizeof(float)),
-                    ptr,
-                    BufferUsageARB.StreamDraw);
-            }
         }
 
         _gl.DrawArrays(PrimitiveType.Triangles, 0, (uint)count);
@@ -512,6 +514,78 @@ public sealed class GlHost : IDisposable
                     PixelType.UnsignedByte,
                     ptr);
             }
+        }
+    }
+
+    private void BindWorldLineState()
+    {
+        _gl.Enable(EnableCap.DepthTest);
+        _gl.DepthFunc(DepthFunction.Less);
+        _gl.Disable(EnableCap.CullFace);
+        _gl.Enable(EnableCap.Blend);
+        _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+        _gl.UseProgram(_worldLineProgram);
+    }
+
+    private void UploadStream(uint vao, uint vbo, ReadOnlySpan<float> floats, ref int capacityFloats)
+    {
+        _gl.BindVertexArray(vao);
+        _gl.BindBuffer(BufferTargetARB.ArrayBuffer, vbo);
+        unsafe
+        {
+            fixed (float* ptr = floats)
+            {
+                var bytes = (nuint)(floats.Length * sizeof(float));
+                if (floats.Length > capacityFloats)
+                {
+                    _gl.BufferData(BufferTargetARB.ArrayBuffer, bytes, ptr, BufferUsageARB.StreamDraw);
+                    capacityFloats = floats.Length;
+                }
+                else
+                {
+                    _gl.BufferSubData(BufferTargetARB.ArrayBuffer, 0, bytes, ptr);
+                }
+            }
+        }
+    }
+
+    private static void PackWorldVertices(ReadOnlySpan<WorldLineVertex> vertices, ref float[] floats)
+    {
+        var needed = vertices.Length * 7;
+        if (floats.Length < needed)
+            floats = new float[needed];
+
+        for (var i = 0; i < vertices.Length; i++)
+        {
+            var v = vertices[i];
+            var o = i * 7;
+            floats[o] = v.X;
+            floats[o + 1] = v.Y;
+            floats[o + 2] = v.Z;
+            floats[o + 3] = v.Color.R / 255f;
+            floats[o + 4] = v.Color.G / 255f;
+            floats[o + 5] = v.Color.B / 255f;
+            floats[o + 6] = v.Color.A / 255f;
+        }
+    }
+
+    private static void PackWorldVertices(ReadOnlySpan<WorldSolidVertex> vertices, ref float[] floats)
+    {
+        var needed = vertices.Length * 7;
+        if (floats.Length < needed)
+            floats = new float[needed];
+
+        for (var i = 0; i < vertices.Length; i++)
+        {
+            var v = vertices[i];
+            var o = i * 7;
+            floats[o] = v.X;
+            floats[o + 1] = v.Y;
+            floats[o + 2] = v.Z;
+            floats[o + 3] = v.Color.R / 255f;
+            floats[o + 4] = v.Color.G / 255f;
+            floats[o + 5] = v.Color.B / 255f;
+            floats[o + 6] = v.Color.A / 255f;
         }
     }
 
