@@ -63,6 +63,43 @@ public sealed class WorldSolidBatch
         Quad(p001, p011, p111, p101, color);
     }
 
+    /// <summary>
+    /// Soft sky dome (upper hemisphere) for atmosphere — inward-facing so the camera sees the underside.
+    /// </summary>
+    public void SkyDome(Vector3 center, float radius, Rgba32 zenith, Rgba32 horizon, int slices = 24, int stacks = 10)
+    {
+        slices = System.Math.Clamp(slices, 8, 48);
+        stacks = System.Math.Clamp(stacks, 4, 24);
+        for (var i = 0; i < stacks; i++)
+        {
+            var v0 = i / (float)stacks;
+            var v1 = (i + 1) / (float)stacks;
+            var phi0 = v0 * (MathF.PI * 0.5f);
+            var phi1 = v1 * (MathF.PI * 0.5f);
+            var y0 = MathF.Sin(phi0) * radius;
+            var y1 = MathF.Sin(phi1) * radius;
+            var r0 = MathF.Cos(phi0) * radius;
+            var r1 = MathF.Cos(phi1) * radius;
+            var c0 = Lerp(horizon, zenith, v0);
+            var c1 = Lerp(horizon, zenith, v1);
+            for (var j = 0; j < slices; j++)
+            {
+                var u0 = j / (float)slices;
+                var u1 = (j + 1) / (float)slices;
+                var th0 = u0 * MathF.Tau;
+                var th1 = u1 * MathF.Tau;
+                var a = center + new Vector3(MathF.Cos(th0) * r0, y0, MathF.Sin(th0) * r0);
+                var b = center + new Vector3(MathF.Cos(th1) * r0, y0, MathF.Sin(th1) * r0);
+                var c = center + new Vector3(MathF.Cos(th1) * r1, y1, MathF.Sin(th1) * r1);
+                var d = center + new Vector3(MathF.Cos(th0) * r1, y1, MathF.Sin(th0) * r1);
+                // Inward winding (camera inside dome).
+                if (i < stacks - 1)
+                    Triangle(a, d, c, c0);
+                Triangle(a, c, b, c1);
+            }
+        }
+    }
+
     /// <summary>Low-poly UV sphere (markers).</summary>
     public void Sphere(Vector3 center, float radius, Rgba32 color, int slices = 10, int stacks = 8)
     {
@@ -100,5 +137,15 @@ public sealed class WorldSolidBatch
     {
         Triangle(a, b, c, color);
         Triangle(a, c, d, color);
+    }
+
+    private static Rgba32 Lerp(Rgba32 a, Rgba32 b, float t)
+    {
+        t = System.Math.Clamp(t, 0f, 1f);
+        return new Rgba32(
+            (byte)(a.R + (b.R - a.R) * t),
+            (byte)(a.G + (b.G - a.G) * t),
+            (byte)(a.B + (b.B - a.B) * t),
+            (byte)(a.A + (b.A - a.A) * t));
     }
 }

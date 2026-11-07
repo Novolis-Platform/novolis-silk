@@ -61,6 +61,27 @@ public sealed class GlHost : IDisposable
         }
         """;
 
+    private const string ScreenGradeFragmentSource = """
+        #version 330 core
+        in vec2 vTex;
+        out vec4 FragColor;
+        uniform float uTime;
+        uniform float uIntensity;
+        void main()
+        {
+            vec2 uv = vTex;
+            float r = length(uv - vec2(0.5));
+            float vignette = smoothstep(0.28, 0.92, r);
+            float heat = 0.5 + 0.5 * sin(uTime * 0.35 + uv.y * 6.0);
+            float grain = fract(sin(dot(uv + uTime * 0.001, vec2(12.9898, 78.233))) * 43758.5453);
+            vec3 cool = vec3(0.02, 0.06, 0.12);
+            vec3 warm = vec3(0.18, 0.07, 0.02);
+            vec3 grade = mix(cool, warm, clamp(uv.y * 0.85 + heat * 0.08, 0.0, 1.0));
+            float a = clamp(vignette * 0.62 + grain * 0.045, 0.0, 0.85) * uIntensity;
+            FragColor = vec4(grade, a);
+        }
+        """;
+
     private const string WorldLineVertexSource = """
         #version 330 core
         layout (location = 0) in vec3 aPos;
@@ -89,6 +110,9 @@ public sealed class GlHost : IDisposable
     private readonly List<GpuVertex> _batch = new(4096);
     private uint _program;
     private uint _blitProgram;
+    private uint _screenGradeProgram;
+    private int _screenGradeTimeLocation;
+    private int _screenGradeIntensityLocation;
     private uint _worldLineProgram;
     private uint _worldSolidProgram;
     private uint _vao;
@@ -200,6 +224,28 @@ public sealed class GlHost : IDisposable
     /// </summary>
     public void BlitOverlay(ReadOnlySpan<Rgba32> pixels, int width, int height) =>
         BlitCore(pixels, width, height, blend: true);
+
+    /// <summary>
+    /// Fullscreen cinematic grade: vignette, warm/cool sky bias, subtle grain.
+    /// Drawn as an alpha overlay (no scene texture required).
+    /// </summary>
+    public void DrawScreenGrade(float timeSeconds, float intensity = 1f)
+    {
+        EnsureInitialized();
+        intensity = float.Clamp(intensity, 0f, 1.5f);
+        if (intensity <= 0.001f)
+            return;
+
+        _gl.Enable(EnableCap.Blend);
+        _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+        _gl.Disable(EnableCap.DepthTest);
+        _gl.UseProgram(_screenGradeProgram);
+        _gl.Uniform1(_screenGradeTimeLocation, timeSeconds);
+        _gl.Uniform1(_screenGradeIntensityLocation, intensity);
+        _gl.BindVertexArray(_blitVao);
+        _gl.DrawArrays(PrimitiveType.Triangles, 0, 6);
+        _gl.BindVertexArray(0);
+    }
 
     private void BlitCore(ReadOnlySpan<Rgba32> pixels, int width, int height, bool blend)
     {
@@ -505,6 +551,8 @@ public sealed class GlHost : IDisposable
         _gl.DeleteBuffer(_blitVbo);
         _gl.DeleteVertexArray(_blitVao);
         _gl.DeleteProgram(_blitProgram);
+        if (_screenGradeProgram != 0)
+            _gl.DeleteProgram(_screenGradeProgram);
         _gl.DeleteBuffer(_worldLineVbo);
         _gl.DeleteVertexArray(_worldLineVao);
         _gl.DeleteProgram(_worldLineProgram);
@@ -821,6 +869,9 @@ public sealed class GlHost : IDisposable
         _gl.VertexAttribPointer(2, 4, VertexAttribPointerType.Float, false, (uint)stride, 4 * sizeof(float));
 
         _blitProgram = CompileProgram(BlitVertexSource, BlitFragmentSource);
+        _screenGradeProgram = CompileProgram(BlitVertexSource, ScreenGradeFragmentSource);
+        _screenGradeTimeLocation = _gl.GetUniformLocation(_screenGradeProgram, "uTime");
+        _screenGradeIntensityLocation = _gl.GetUniformLocation(_screenGradeProgram, "uIntensity");
         _blitVao = _gl.GenVertexArray();
         _blitVbo = _gl.GenBuffer();
         float[] quad =

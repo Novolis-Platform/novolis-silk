@@ -66,6 +66,13 @@ public sealed class SilkFrame
         _input = input;
     }
 
+    internal void Unbind()
+    {
+        _window = null;
+        _host = null;
+        _input = null;
+    }
+
     internal void SetFrame(Vector2D<int> size, float deltaSeconds)
     {
         _width = size.X;
@@ -123,6 +130,10 @@ public sealed class SilkFrame
     /// <summary>Alpha-composites CPU RGBA pixels over the current frame (HUD overlay).</summary>
     public void BlitOverlay(ReadOnlySpan<Rgba32> pixels, int width, int height) =>
         Host.BlitOverlay(pixels, width, height);
+
+    /// <summary>Fullscreen cinematic grade overlay (vignette / warm-cool / grain).</summary>
+    public void DrawScreenGrade(float timeSeconds, float intensity = 1f) =>
+        Host.DrawScreenGrade(timeSeconds, intensity);
 
     /// <summary>Clears the framebuffer.</summary>
     public void Clear(Rgba32 color, bool depth = true) => Host.Clear(color, depth);

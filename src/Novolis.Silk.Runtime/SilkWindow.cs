@@ -45,13 +45,15 @@ public static class SilkWindow
         using var window = Window.Create(options);
         var ctx = new SilkFrame();
         GlHost? host = null;
+        IInputContext? input = null;
         var initialized = false;
 
         window.Load += () =>
         {
             var gl = GL.GetApi(window);
             host = new GlHost(gl);
-            ctx.Bind(window, host, window.CreateInput());
+            input = window.CreateInput();
+            ctx.Bind(window, host, input);
         };
 
         window.Update += delta => ctx.SetFrame(window.FramebufferSize, (float)delta);
@@ -79,17 +81,29 @@ public static class SilkWindow
 
         void ReleaseHost()
         {
-            if (host is null)
+            if (host is null && input is null)
             {
                 return;
             }
 
             window.GLContext?.MakeCurrent();
-            host.Dispose();
+            host?.Dispose();
             host = null;
+            // Assimp/GLFW reuse window handles across headless captures; dispose input
+            // or the next CreateInput throws "More than one input context for window".
+            input?.Dispose();
+            input = null;
+            ctx.Unbind();
         }
 
         window.Closing += ReleaseHost;
-        window.Run();
+        try
+        {
+            window.Run();
+        }
+        finally
+        {
+            ReleaseHost();
+        }
     }
 }
