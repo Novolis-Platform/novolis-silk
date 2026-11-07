@@ -1,9 +1,9 @@
+using Novolis.Math.Geometry;
 using Novolis.Silk.Capture;
-using Novolis.Silk;
 
 namespace Novolis.Silk;
 
-/// <summary>Hidden Silk/GLFW loop → PNG via framebuffer readback.</summary>
+/// <summary>Hidden Silk/GLFW loop → PNG via framebuffer readback (or streaming sink).</summary>
 public static class SilkHeadlessCapture
 {
     /// <summary>One hidden window; each step prepares pose then draws; writes PNG paths.</summary>
@@ -16,21 +16,56 @@ public static class SilkHeadlessCapture
         string windowTitle = "Novolis Silk capture")
     {
         ArgumentNullException.ThrowIfNull(steps);
-        ArgumentNullException.ThrowIfNull(draw);
-        if (steps.Count == 0)
-            return Array.Empty<string>();
-
         var saved = new List<string>(steps.Count);
+        CaptureSequence(
+            width,
+            height,
+            steps.Select(s => s.Prepare).ToList(),
+            draw,
+            (pixels, w, h, index) =>
+            {
+                var path = steps[index].Path;
+                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                File.WriteAllBytes(path, RgbaPng.Encode(pixels, w, h));
+                saved.Add(path);
+                return true;
+            },
+            warmFramesPerStep,
+            windowTitle);
+        return saved;
+    }
+
+    /// <summary>
+    /// Stream raw RGBA frames without touching disk. <paramref name="onFrame"/> receives
+    /// top-left origin pixels; return false to abort early.
+    /// </summary>
+    public static int CaptureSequence(
+        int width,
+        int height,
+        IReadOnlyList<Action> prepares,
+        Action<SilkFrame> draw,
+        Func<Rgba32[], int, int, int, bool> onFrame,
+        int warmFramesPerStep = 0,
+        string windowTitle = "Novolis Silk capture")
+    {
+        ArgumentNullException.ThrowIfNull(prepares);
+        ArgumentNullException.ThrowIfNull(draw);
+        ArgumentNullException.ThrowIfNull(onFrame);
+        if (prepares.Count == 0)
+            return 0;
+
         using var capture = new FrameCaptureSession(new CaptureStreamOptions
         {
             CaptureEveryNFrames = 1,
-            MaxBufferedFrames = 8,
+            MaxBufferedFrames = 4,
         });
 
         var index = 0;
+        var written = 0;
         var warmLeft = warmFramesPerStep;
         var retries = 0;
         const int maxRetries = 24;
+        var abort = false;
 
         SilkGame.Run(
             windowTitle,
@@ -39,14 +74,14 @@ public static class SilkHeadlessCapture
             initialize: null,
             update: frame =>
             {
-                if (index >= steps.Count)
+                if (abort || index >= prepares.Count)
                 {
                     frame.Close();
                     return;
                 }
 
                 if (warmLeft == warmFramesPerStep)
-                    steps[index].Prepare();
+                    prepares[index]();
 
                 draw(frame);
 
@@ -62,16 +97,19 @@ public static class SilkHeadlessCapture
                     retries++;
                     if (retries >= maxRetries)
                         throw new InvalidOperationException(
-                            $"Silk framebuffer capture failed for '{steps[index].Path}'.");
+                            $"Silk framebuffer capture failed at step {index}.");
                     return;
                 }
 
                 retries = 0;
-                var png = RgbaPng.Encode(shot.Pixels, shot.Width, shot.Height);
-                var path = steps[index].Path;
-                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-                File.WriteAllBytes(path, png);
-                saved.Add(path);
+                if (!onFrame(shot.Pixels, shot.Width, shot.Height, index))
+                {
+                    abort = true;
+                    frame.Close();
+                    return;
+                }
+
+                written++;
                 index++;
                 warmLeft = warmFramesPerStep;
             },
@@ -79,7 +117,7 @@ public static class SilkHeadlessCapture
             captureSession: null,
             visible: false);
 
-        return saved;
+        return written;
     }
 
     /// <summary>Captures one headless frame and returns PNG bytes, or null on failure.</summary>
@@ -88,7 +126,7 @@ public static class SilkHeadlessCapture
         var path = Path.Combine(Path.GetTempPath(), "novolis-silk-" + Guid.NewGuid().ToString("N") + ".png");
         try
         {
-            var saved = CaptureSequence(width, height, [(path, prepare)], draw);
+            var saved = CaptureSequence(width, height, [(path, prepare)], draw, warmFramesPerStep: 1);
             if (saved.Count == 0 || !File.Exists(path))
                 return null;
             return File.ReadAllBytes(path);
