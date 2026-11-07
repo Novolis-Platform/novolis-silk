@@ -89,11 +89,18 @@ public sealed class SilkFrame
     /// <summary>Draws a tessellated planar frame.</summary>
     public void Submit(PlanarDrawList list) => Host.Submit(list);
 
-    /// <summary>Blits CPU RGBA pixels to the window.</summary>
+    /// <summary>Blits CPU RGBA pixels to the window (replaces color buffer).</summary>
     public void Blit(ReadOnlySpan<Rgba32> pixels, int width, int height) => Host.Blit(pixels, width, height);
+
+    /// <summary>Alpha-composites CPU RGBA pixels over the current frame (HUD overlay).</summary>
+    public void BlitOverlay(ReadOnlySpan<Rgba32> pixels, int width, int height) =>
+        Host.BlitOverlay(pixels, width, height);
 
     /// <summary>Clears the framebuffer.</summary>
     public void Clear(Rgba32 color, bool depth = true) => Host.Clear(color, depth);
+
+    /// <summary>Clears only depth so screen-space HUD can draw over a finished 3D frame.</summary>
+    public void ClearDepth() => Host.ClearDepth();
 
     /// <summary>Draws world-space line pairs with a view-projection matrix (streams each call).</summary>
     public void DrawWorldLines(ReadOnlySpan<WorldLineVertex> vertices, in Matrix4x4 viewProjection) =>

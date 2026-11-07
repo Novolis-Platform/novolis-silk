@@ -185,13 +185,32 @@ public sealed class GlHost : IDisposable
         Flush(mvp, currentTex);
     }
 
-    /// <summary>Uploads a CPU RGBA frame as a full-window blit.</summary>
-    public void Blit(ReadOnlySpan<Rgba32> pixels, int width, int height)
+    /// <summary>Uploads a CPU RGBA frame as a full-window blit (replaces color buffer).</summary>
+    public void Blit(ReadOnlySpan<Rgba32> pixels, int width, int height) =>
+        BlitCore(pixels, width, height, blend: false);
+
+    /// <summary>
+    /// Alpha-composites a CPU RGBA frame over the current color buffer (HUD overlay).
+    /// Transparent pixels leave the 3D scene visible.
+    /// </summary>
+    public void BlitOverlay(ReadOnlySpan<Rgba32> pixels, int width, int height) =>
+        BlitCore(pixels, width, height, blend: true);
+
+    private void BlitCore(ReadOnlySpan<Rgba32> pixels, int width, int height, bool blend)
     {
         EnsureInitialized();
         Resize(width, height);
         EnsureBlitTexture(pixels, width, height);
-        _gl.Disable(EnableCap.Blend);
+        if (blend)
+        {
+            _gl.Enable(EnableCap.Blend);
+            _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+        }
+        else
+        {
+            _gl.Disable(EnableCap.Blend);
+        }
+
         _gl.Disable(EnableCap.DepthTest);
         _gl.UseProgram(_blitProgram);
         _gl.ActiveTexture(TextureUnit.Texture0);
@@ -215,6 +234,14 @@ public sealed class GlHost : IDisposable
         }
 
         _gl.Clear(mask);
+    }
+
+    /// <summary>Clears only the depth buffer (e.g. before screen-space HUD over a 3D scene).</summary>
+    public void ClearDepth()
+    {
+        EnsureInitialized();
+        _gl.ClearDepth(1.0);
+        _gl.Clear(ClearBufferMask.DepthBufferBit);
     }
 
     /// <summary>

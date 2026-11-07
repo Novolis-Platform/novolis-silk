@@ -161,11 +161,17 @@ public enum Key
     /// <summary>Left shift.</summary>
     ShiftLeft = 340,
 
+    /// <summary>Left control.</summary>
+    ControlLeft = 341,
+
     /// <summary>Left alt.</summary>
     AltLeft = 342,
 
     /// <summary>Right shift.</summary>
     ShiftRight = 344,
+
+    /// <summary>Right control.</summary>
+    ControlRight = 345,
 
     /// <summary>Right alt.</summary>
     AltRight = 346,
