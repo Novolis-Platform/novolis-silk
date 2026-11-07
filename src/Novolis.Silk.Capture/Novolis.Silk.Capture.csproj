@@ -4,7 +4,7 @@
     <RootNamespace>Novolis.Silk.Capture</RootNamespace>
     <AssemblyName>Novolis.Silk.Capture</AssemblyName>
     <IsPackable>true</IsPackable>
-    <Description>OpenGL framebuffer readback for Novolis.Silk hosts (Rgba32 pixels) plus minimal RGBA→PNG encoding.</Description>
+    <Description>OpenGL framebuffer readback for Novolis.Silk hosts (Rgba32 pixels), RGBA→PNG encoding, and native RGBA→H.264 video via ffmpeg.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Novolis.Silk.Runtime\Novolis.Silk.Runtime.csproj" />

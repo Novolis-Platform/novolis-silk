@@ -74,6 +74,16 @@ public sealed class SilkFrame
         PollMouse();
     }
 
+    /// <summary>
+    /// Forces logical frame size for offscreen capture (exact WxH), independent of the GLFW window FB.
+    /// </summary>
+    public void OverrideSize(int width, int height)
+    {
+        _width = System.Math.Max(1, width);
+        _height = System.Math.Max(1, height);
+        _host?.Resize(_width, _height);
+    }
+
     /// <summary>Updates the window title.</summary>
     public void SetTitle(string title)
     {

@@ -3,10 +3,16 @@ using Novolis.Silk.Capture;
 
 namespace Novolis.Silk;
 
-/// <summary>Hidden Silk/GLFW loop → PNG via framebuffer readback (or streaming sink).</summary>
+/// <summary>
+/// Hidden Silk/GLFW loop → exact-resolution offscreen FBO readback (PNG or native video).
+/// Capture size is independent of the GLFW window framebuffer / DPI.
+/// </summary>
 public static class SilkHeadlessCapture
 {
-    /// <summary>One hidden window; each step prepares pose then draws; writes PNG paths.</summary>
+    /// <summary>Small GL context window; pixels come from the offscreen capture FBO.</summary>
+    private const int ContextWindowSize = 256;
+
+    /// <summary>One hidden window; each step prepares pose then draws; writes PNG paths at exact WxH.</summary>
     public static IReadOnlyList<string> CaptureSequence(
         int width,
         int height,
@@ -24,6 +30,9 @@ public static class SilkHeadlessCapture
             draw,
             (pixels, w, h, index) =>
             {
+                if (w != width || h != height)
+                    throw new InvalidOperationException(
+                        $"Silk capture size mismatch: got {w}x{h}, expected {width}x{height}.");
                 var path = steps[index].Path;
                 Directory.CreateDirectory(Path.GetDirectoryName(path)!);
                 File.WriteAllBytes(path, RgbaPng.Encode(pixels, w, h));
@@ -36,8 +45,8 @@ public static class SilkHeadlessCapture
     }
 
     /// <summary>
-    /// Stream raw RGBA frames without touching disk. <paramref name="onFrame"/> receives
-    /// top-left origin pixels; return false to abort early.
+    /// Stream exact-resolution RGBA frames without touching disk. <paramref name="onFrame"/> receives
+    /// top-left origin pixels at the requested width/height; return false to abort early.
     /// </summary>
     public static int CaptureSequence(
         int width,
@@ -51,14 +60,10 @@ public static class SilkHeadlessCapture
         ArgumentNullException.ThrowIfNull(prepares);
         ArgumentNullException.ThrowIfNull(draw);
         ArgumentNullException.ThrowIfNull(onFrame);
+        if (width < 1 || height < 1)
+            throw new ArgumentOutOfRangeException(nameof(width), "Capture size must be positive.");
         if (prepares.Count == 0)
             return 0;
-
-        using var capture = new FrameCaptureSession(new CaptureStreamOptions
-        {
-            CaptureEveryNFrames = 1,
-            MaxBufferedFrames = 4,
-        });
 
         var index = 0;
         var written = 0;
@@ -67,10 +72,11 @@ public static class SilkHeadlessCapture
         const int maxRetries = 24;
         var abort = false;
 
+        // Context window stays tiny; BeginCaptureTarget owns the real pixel budget.
         SilkGame.Run(
             windowTitle,
-            width,
-            height,
+            ContextWindowSize,
+            ContextWindowSize,
             initialize: null,
             update: frame =>
             {
@@ -83,41 +89,98 @@ public static class SilkHeadlessCapture
                 if (warmLeft == warmFramesPerStep)
                     prepares[index]();
 
-                draw(frame);
-
-                if (warmLeft > 0)
+                var host = frame.Host;
+                host.BeginCaptureTarget(width, height);
+                frame.OverrideSize(width, height);
+                try
                 {
-                    warmLeft--;
-                    return;
-                }
+                    draw(frame);
 
-                capture.CaptureAfterDraw(frame.Host);
-                if (!capture.TryRead(out var shot) || shot.Pixels is not { Length: > 0 })
-                {
-                    retries++;
-                    if (retries >= maxRetries)
+                    if (warmLeft > 0)
+                    {
+                        warmLeft--;
+                        return;
+                    }
+
+                    if (!host.TryReadPixels(out var pixels) || pixels.Length == 0)
+                    {
+                        retries++;
+                        if (retries >= maxRetries)
+                            throw new InvalidOperationException(
+                                $"Silk offscreen capture failed at step {index} ({width}x{height}).");
+                        return;
+                    }
+
+                    if (pixels.Length != width * height)
                         throw new InvalidOperationException(
-                            $"Silk framebuffer capture failed at step {index}.");
-                    return;
-                }
+                            $"Silk capture buffer {pixels.Length} != {width}*{height}.");
 
-                retries = 0;
-                if (!onFrame(shot.Pixels, shot.Width, shot.Height, index))
+                    retries = 0;
+                    if (!onFrame(pixels, width, height, index))
+                    {
+                        abort = true;
+                        frame.Close();
+                        return;
+                    }
+
+                    written++;
+                    index++;
+                    warmLeft = warmFramesPerStep;
+                }
+                finally
                 {
-                    abort = true;
-                    frame.Close();
-                    return;
+                    host.EndCaptureTarget();
                 }
-
-                written++;
-                index++;
-                warmLeft = warmFramesPerStep;
             },
             renderOverlay: null,
             captureSession: null,
             visible: false);
 
         return written;
+    }
+
+    /// <summary>
+    /// Native video: exact WxH offscreen frames streamed into H.264 MP4 (ffmpeg).
+    /// Optional <paramref name="onFrame"/> can snapshot keyframes; return false to abort.
+    /// </summary>
+    public static SilkVideoCaptureResult CaptureVideo(
+        VideoEncodeOptions encode,
+        IReadOnlyList<Action> prepares,
+        Action<SilkFrame> draw,
+        Func<Rgba32[], int, int, int, bool>? onFrame = null,
+        int warmFramesPerStep = 0,
+        string windowTitle = "Novolis Silk video")
+    {
+        ArgumentNullException.ThrowIfNull(encode);
+        ArgumentNullException.ThrowIfNull(prepares);
+        ArgumentNullException.ThrowIfNull(draw);
+
+        using var encoder = RgbaVideoEncoder.Create(encode);
+        var written = CaptureSequence(
+            encode.Width,
+            encode.Height,
+            prepares,
+            draw,
+            (pixels, w, h, index) =>
+            {
+                encoder.WriteFrame(pixels);
+                return onFrame?.Invoke(pixels, w, h, index) ?? true;
+            },
+            warmFramesPerStep,
+            windowTitle);
+
+        encoder.Complete();
+        if (written == 0)
+            throw new InvalidOperationException("Silk video capture produced no frames.");
+
+        return new SilkVideoCaptureResult
+        {
+            OutputPath = encode.OutputPath,
+            FrameCount = written,
+            Width = encode.Width,
+            Height = encode.Height,
+            Fps = encode.Fps,
+        };
     }
 
     /// <summary>Captures one headless frame and returns PNG bytes, or null on failure.</summary>

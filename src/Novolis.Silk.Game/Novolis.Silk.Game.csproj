@@ -4,7 +4,7 @@
     <RootNamespace>Novolis.Silk</RootNamespace>
     <AssemblyName>Novolis.Silk.Game</AssemblyName>
     <IsPackable>true</IsPackable>
-    <Description>Jam loop for Novolis.Silk — Run(title, size, update), CAD draw facade (SilkCadWorld), and headless capture sequences. No scene types.</Description>
+    <Description>Jam loop for Novolis.Silk — Run(title, size, update), CAD draw facade (SilkCadWorld), and headless still/video capture at exact offscreen resolution. No scene types.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Novolis.Silk.Runtime\Novolis.Silk.Runtime.csproj" />

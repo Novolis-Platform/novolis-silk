@@ -113,6 +113,11 @@ public sealed class GlHost : IDisposable
     private float[] _worldSolidScratch = [];
     private int _worldLineVboCapacityFloats;
     private int _worldSolidVboCapacityFloats;
+    private uint _captureFbo;
+    private uint _captureColor;
+    private uint _captureDepth;
+    private int _captureWidth;
+    private int _captureHeight;
 
     /// <summary>Creates a host for an existing OpenGL context.</summary>
     /// <param name="gl">Active Silk GL API (kept inside this assembly).</param>
@@ -411,6 +416,30 @@ public sealed class GlHost : IDisposable
         mesh.Draw(_worldSolidProgram, _worldSolidMvpLocation, viewProjection);
     }
 
+    /// <summary>
+    /// Binds an offscreen color+depth target at an exact pixel size (independent of the GLFW window FB).
+    /// Use for headless stills/video so DPI / monitor limits cannot shrink the capture.
+    /// </summary>
+    public void BeginCaptureTarget(int width, int height)
+    {
+        EnsureInitialized();
+        width = System.Math.Max(1, width);
+        height = System.Math.Max(1, height);
+        if (_captureFbo == 0 || _captureWidth != width || _captureHeight != height)
+            RecreateCaptureTarget(width, height);
+
+        _gl.BindFramebuffer(FramebufferTarget.Framebuffer, _captureFbo);
+        Resize(width, height);
+    }
+
+    /// <summary>Unbinds the capture target and restores the default framebuffer.</summary>
+    public void EndCaptureTarget()
+    {
+        if (_disposed)
+            return;
+        _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+    }
+
     /// <summary>Reads the current framebuffer as top-left origin RGBA.</summary>
     public bool TryReadPixels(out Rgba32[] pixels)
     {
@@ -457,6 +486,8 @@ public sealed class GlHost : IDisposable
             return;
         }
 
+        ReleaseCaptureTarget();
+
         foreach (var tex in _gpuTextures.Values)
         {
             _gl.DeleteTexture(tex);
@@ -480,6 +511,82 @@ public sealed class GlHost : IDisposable
         _gl.DeleteBuffer(_worldSolidVbo);
         _gl.DeleteVertexArray(_worldSolidVao);
         _gl.DeleteProgram(_worldSolidProgram);
+    }
+
+    private void RecreateCaptureTarget(int width, int height)
+    {
+        ReleaseCaptureTarget();
+
+        _captureFbo = _gl.GenFramebuffer();
+        _captureColor = _gl.GenTexture();
+        _captureDepth = _gl.GenRenderbuffer();
+        _captureWidth = width;
+        _captureHeight = height;
+
+        _gl.BindTexture(TextureTarget.Texture2D, _captureColor);
+        unsafe
+        {
+            _gl.TexImage2D(
+                TextureTarget.Texture2D,
+                0,
+                InternalFormat.Rgba8,
+                (uint)width,
+                (uint)height,
+                0,
+                PixelFormat.Rgba,
+                PixelType.UnsignedByte,
+                null);
+        }
+
+        _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+        _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
+        _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
+        _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
+
+        _gl.BindRenderbuffer(RenderbufferTarget.Renderbuffer, _captureDepth);
+        _gl.RenderbufferStorage(RenderbufferTarget.Renderbuffer, InternalFormat.DepthComponent24, (uint)width, (uint)height);
+
+        _gl.BindFramebuffer(FramebufferTarget.Framebuffer, _captureFbo);
+        _gl.FramebufferTexture2D(
+            FramebufferTarget.Framebuffer,
+            FramebufferAttachment.ColorAttachment0,
+            TextureTarget.Texture2D,
+            _captureColor,
+            0);
+        _gl.FramebufferRenderbuffer(
+            FramebufferTarget.Framebuffer,
+            FramebufferAttachment.DepthAttachment,
+            RenderbufferTarget.Renderbuffer,
+            _captureDepth);
+
+        var status = _gl.CheckFramebufferStatus(FramebufferTarget.Framebuffer);
+        _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+        if (status != GLEnum.FramebufferComplete)
+            throw new InvalidOperationException($"Silk capture FBO incomplete ({status}) at {width}x{height}.");
+    }
+
+    private void ReleaseCaptureTarget()
+    {
+        if (_captureFbo != 0)
+        {
+            _gl.DeleteFramebuffer(_captureFbo);
+            _captureFbo = 0;
+        }
+
+        if (_captureColor != 0)
+        {
+            _gl.DeleteTexture(_captureColor);
+            _captureColor = 0;
+        }
+
+        if (_captureDepth != 0)
+        {
+            _gl.DeleteRenderbuffer(_captureDepth);
+            _captureDepth = 0;
+        }
+
+        _captureWidth = 0;
+        _captureHeight = 0;
     }
 
     private void AddVertex(PlanarVertex v) =>
