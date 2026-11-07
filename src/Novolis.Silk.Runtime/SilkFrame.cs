@@ -1,5 +1,6 @@
 using System.Numerics;
 using Novolis.Math.Geometry;
+using Silk.NET.Core;
 using Silk.NET.Maths;
 using Silk.NET.Windowing;
 using SilkInput = Silk.NET.Input;
@@ -91,6 +92,23 @@ public sealed class SilkFrame
         {
             _window.Title = title;
         }
+    }
+
+    /// <summary>
+    /// Sets the OS / title-bar window icon from tightly packed RGBA8 pixels
+    /// (row-major, top-left origin). Call after the GL context is bound (e.g. from Initialize).
+    /// </summary>
+    public void SetWindowIcon(int width, int height, ReadOnlySpan<byte> rgba8888)
+    {
+        if (_window is null || width < 1 || height < 1)
+            return;
+
+        var expected = checked(width * height * 4);
+        if (rgba8888.Length < expected)
+            throw new ArgumentException($"RGBA buffer needs {expected} bytes for {width}×{height}.", nameof(rgba8888));
+
+        var copy = rgba8888[..expected].ToArray();
+        _window.SetWindowIcon([new RawImage(width, height, new Memory<byte>(copy))]);
     }
 
     /// <summary>Closes the window after the current frame.</summary>
