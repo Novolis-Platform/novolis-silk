@@ -28,6 +28,61 @@ public sealed class SilkCadWorld
     public void DrawCubeV(Vector3 center, Vector3 size, Color color) =>
         _batch.Cube(center, size.X, size.Y, size.Z, ToRgba(color));
 
+    /// <summary>
+    /// Oriented solid box: local half-extents along +X/+Y/+Z after <paramref name="rotation"/>,
+    /// then translated to <paramref name="center"/>. Used for polygonal frame edge members.
+    /// </summary>
+    public void DrawOrientedBox(Vector3 center, Vector3 localHalfExtents, Quaternion rotation, Color color)
+    {
+        var rgba = ToRgba(color);
+        var hx = MathF.Abs(localHalfExtents.X);
+        var hy = MathF.Abs(localHalfExtents.Y);
+        var hz = MathF.Abs(localHalfExtents.Z);
+        Span<Vector3> p = stackalloc Vector3[8];
+        p[0] = center + Vector3.Transform(new Vector3(-hx, -hy, -hz), rotation);
+        p[1] = center + Vector3.Transform(new Vector3(+hx, -hy, -hz), rotation);
+        p[2] = center + Vector3.Transform(new Vector3(+hx, +hy, -hz), rotation);
+        p[3] = center + Vector3.Transform(new Vector3(-hx, +hy, -hz), rotation);
+        p[4] = center + Vector3.Transform(new Vector3(-hx, -hy, +hz), rotation);
+        p[5] = center + Vector3.Transform(new Vector3(+hx, -hy, +hz), rotation);
+        p[6] = center + Vector3.Transform(new Vector3(+hx, +hy, +hz), rotation);
+        p[7] = center + Vector3.Transform(new Vector3(-hx, +hy, +hz), rotation);
+        void Face(int a, int b, int c, int d)
+        {
+            _batch.Triangle(p[a], p[b], p[c], rgba);
+            _batch.Triangle(p[a], p[c], p[d], rgba);
+        }
+
+        Face(0, 1, 2, 3); // -Z
+        Face(4, 7, 6, 5); // +Z
+        Face(0, 4, 5, 1); // -Y
+        Face(3, 2, 6, 7); // +Y
+        Face(0, 3, 7, 4); // -X
+        Face(1, 5, 6, 2); // +X
+    }
+
+    /// <summary>Wire edges of an oriented box (same local frame as <see cref="DrawOrientedBox"/>).</summary>
+    public void DrawOrientedBoxWires(Vector3 center, Vector3 localHalfExtents, Quaternion rotation, Color color)
+    {
+        var c = ToRgba(color);
+        var hx = MathF.Abs(localHalfExtents.X);
+        var hy = MathF.Abs(localHalfExtents.Y);
+        var hz = MathF.Abs(localHalfExtents.Z);
+        Span<Vector3> p = stackalloc Vector3[8];
+        p[0] = center + Vector3.Transform(new Vector3(-hx, -hy, -hz), rotation);
+        p[1] = center + Vector3.Transform(new Vector3(+hx, -hy, -hz), rotation);
+        p[2] = center + Vector3.Transform(new Vector3(+hx, +hy, -hz), rotation);
+        p[3] = center + Vector3.Transform(new Vector3(-hx, +hy, -hz), rotation);
+        p[4] = center + Vector3.Transform(new Vector3(-hx, -hy, +hz), rotation);
+        p[5] = center + Vector3.Transform(new Vector3(+hx, -hy, +hz), rotation);
+        p[6] = center + Vector3.Transform(new Vector3(+hx, +hy, +hz), rotation);
+        p[7] = center + Vector3.Transform(new Vector3(-hx, +hy, +hz), rotation);
+        void Edge(int a, int b) => _batch.Line(p[a], p[b], c);
+        Edge(0, 1); Edge(1, 2); Edge(2, 3); Edge(3, 0);
+        Edge(4, 5); Edge(5, 6); Edge(6, 7); Edge(7, 4);
+        Edge(0, 4); Edge(1, 5); Edge(2, 6); Edge(3, 7);
+    }
+
     /// <summary>Queues a solid sphere approximation.</summary>
     public void DrawSphere(Vector3 center, float radius, Color color) =>
         _batch.Sphere(center, radius, ToRgba(color));
