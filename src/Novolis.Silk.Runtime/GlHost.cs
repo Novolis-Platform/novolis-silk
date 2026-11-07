@@ -320,6 +320,7 @@ public sealed class GlHost : IDisposable
     /// <summary>
     /// Draws world-space triangles (groups of 3 <see cref="WorldSolidVertex"/>) with a view-projection matrix.
     /// Math/BCL handshake only — no Rendering types.
+    /// Prefer <see cref="CreateWorldSolidMesh"/> for static geometry.
     /// </summary>
     public void DrawWorldTriangles(ReadOnlySpan<WorldSolidVertex> vertices, in Matrix4x4 viewProjection)
     {
@@ -329,13 +330,9 @@ public sealed class GlHost : IDisposable
         EnsureInitialized();
         var count = vertices.Length - (vertices.Length % 3);
         PackWorldVertices(vertices[..count], ref _worldSolidScratch);
-        _gl.Enable(EnableCap.DepthTest);
-        _gl.DepthFunc(DepthFunction.Less);
-        _gl.Enable(EnableCap.CullFace);
-        _gl.CullFace(TriangleFace.Back);
-        _gl.Enable(EnableCap.Blend);
-        _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
-        _gl.UseProgram(_worldSolidProgram);
+        BindWorldSolidState();
+        // Same as DrawWorldSolidMesh: mirrored map MVP flips winding — do not cull.
+        _gl.Disable(EnableCap.CullFace);
         UploadStream(_worldSolidVao, _worldSolidVbo, _worldSolidScratch.AsSpan(0, count * 7), ref _worldSolidVboCapacityFloats);
         var mvp = viewProjection;
         unsafe
@@ -345,7 +342,57 @@ public sealed class GlHost : IDisposable
 
         _gl.DrawArrays(PrimitiveType.Triangles, 0, (uint)count);
         _gl.BindVertexArray(0);
+    }
+
+    /// <summary>
+    /// Uploads triangle vertices once into a GPU mesh. Draw with <see cref="DrawWorldSolidMesh"/> each frame.
+    /// </summary>
+    public WorldSolidGpuMesh CreateWorldSolidMesh(ReadOnlySpan<WorldSolidVertex> vertices)
+    {
+        EnsureInitialized();
+        var count = vertices.Length - (vertices.Length % 3);
+        if (count < 3)
+            return new WorldSolidGpuMesh(_gl, 0, 0, 0);
+
+        PackWorldVertices(vertices[..count], ref _worldSolidScratch);
+        var vao = _gl.GenVertexArray();
+        var vbo = _gl.GenBuffer();
+        _gl.BindVertexArray(vao);
+        _gl.BindBuffer(BufferTargetARB.ArrayBuffer, vbo);
+        unsafe
+        {
+            fixed (float* ptr = _worldSolidScratch)
+            {
+                _gl.BufferData(
+                    BufferTargetARB.ArrayBuffer,
+                    (nuint)(count * 7 * sizeof(float)),
+                    ptr,
+                    BufferUsageARB.StaticDraw);
+            }
+        }
+
+        var stride = 7 * sizeof(float);
+        _gl.EnableVertexAttribArray(0);
+        _gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, (uint)stride, 0);
+        _gl.EnableVertexAttribArray(1);
+        _gl.VertexAttribPointer(1, 4, VertexAttribPointerType.Float, false, (uint)stride, 3 * sizeof(float));
+        _gl.BindVertexArray(0);
+        return new WorldSolidGpuMesh(_gl, vao, vbo, count);
+    }
+
+    /// <summary>Draws a previously uploaded <see cref="WorldSolidGpuMesh"/> (no CPU→GPU copy).</summary>
+    public void DrawWorldSolidMesh(WorldSolidGpuMesh mesh, in Matrix4x4 viewProjection)
+    {
+        ArgumentNullException.ThrowIfNull(mesh);
+        if (mesh.VertexCount < 3)
+            return;
+
+        EnsureInitialized();
+        BindWorldSolidState();
+        // Disable before draw — Bind enables CullFace, but map views mirror X
+        // (CreateScale(-1,1,1)) which flips winding and would hide the whole sheet.
         _gl.Disable(EnableCap.CullFace);
+        mesh.Draw(_worldSolidProgram, _worldSolidMvpLocation, viewProjection);
     }
 
     /// <summary>Reads the current framebuffer as top-left origin RGBA.</summary>
@@ -552,6 +599,17 @@ public sealed class GlHost : IDisposable
         _gl.Enable(EnableCap.Blend);
         _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
         _gl.UseProgram(_worldLineProgram);
+    }
+
+    private void BindWorldSolidState()
+    {
+        _gl.Enable(EnableCap.DepthTest);
+        _gl.DepthFunc(DepthFunction.Less);
+        _gl.Enable(EnableCap.CullFace);
+        _gl.CullFace(TriangleFace.Back);
+        _gl.Enable(EnableCap.Blend);
+        _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+        _gl.UseProgram(_worldSolidProgram);
     }
 
     private void UploadStream(uint vao, uint vbo, ReadOnlySpan<float> floats, ref int capacityFloats)

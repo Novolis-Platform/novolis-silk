@@ -118,6 +118,14 @@ public sealed class SilkFrame
     public void DrawWorldTriangles(ReadOnlySpan<WorldSolidVertex> vertices, in Matrix4x4 viewProjection) =>
         Host.DrawWorldTriangles(vertices, viewProjection);
 
+    /// <summary>Uploads static world triangles once; redraw with <see cref="DrawWorldSolidMesh"/>.</summary>
+    public WorldSolidGpuMesh CreateWorldSolidMesh(ReadOnlySpan<WorldSolidVertex> vertices) =>
+        Host.CreateWorldSolidMesh(vertices);
+
+    /// <summary>Draws a GPU-resident world-solid mesh (no per-frame upload).</summary>
+    public void DrawWorldSolidMesh(WorldSolidGpuMesh mesh, in Matrix4x4 viewProjection) =>
+        Host.DrawWorldSolidMesh(mesh, viewProjection);
+
     /// <summary>Submits a <see cref="WorldSolidBatch"/> (triangles then lines).</summary>
     public void SubmitWorld(WorldSolidBatch batch, in Matrix4x4 viewProjection)
     {
