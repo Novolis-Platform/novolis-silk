@@ -38,27 +38,26 @@ public sealed class SilkCadWorld
         var hx = MathF.Abs(localHalfExtents.X);
         var hy = MathF.Abs(localHalfExtents.Y);
         var hz = MathF.Abs(localHalfExtents.Z);
-        Span<Vector3> p = stackalloc Vector3[8];
-        p[0] = center + Vector3.Transform(new Vector3(-hx, -hy, -hz), rotation);
-        p[1] = center + Vector3.Transform(new Vector3(+hx, -hy, -hz), rotation);
-        p[2] = center + Vector3.Transform(new Vector3(+hx, +hy, -hz), rotation);
-        p[3] = center + Vector3.Transform(new Vector3(-hx, +hy, -hz), rotation);
-        p[4] = center + Vector3.Transform(new Vector3(-hx, -hy, +hz), rotation);
-        p[5] = center + Vector3.Transform(new Vector3(+hx, -hy, +hz), rotation);
-        p[6] = center + Vector3.Transform(new Vector3(+hx, +hy, +hz), rotation);
-        p[7] = center + Vector3.Transform(new Vector3(-hx, +hy, +hz), rotation);
-        void Face(int a, int b, int c, int d)
+        var c0 = center + Vector3.Transform(new Vector3(-hx, -hy, -hz), rotation);
+        var c1 = center + Vector3.Transform(new Vector3(+hx, -hy, -hz), rotation);
+        var c2 = center + Vector3.Transform(new Vector3(+hx, +hy, -hz), rotation);
+        var c3 = center + Vector3.Transform(new Vector3(-hx, +hy, -hz), rotation);
+        var c4 = center + Vector3.Transform(new Vector3(-hx, -hy, +hz), rotation);
+        var c5 = center + Vector3.Transform(new Vector3(+hx, -hy, +hz), rotation);
+        var c6 = center + Vector3.Transform(new Vector3(+hx, +hy, +hz), rotation);
+        var c7 = center + Vector3.Transform(new Vector3(-hx, +hy, +hz), rotation);
+        void Face(Vector3 a, Vector3 b, Vector3 c, Vector3 d)
         {
-            _batch.Triangle(p[a], p[b], p[c], rgba);
-            _batch.Triangle(p[a], p[c], p[d], rgba);
+            _batch.Triangle(a, b, c, rgba);
+            _batch.Triangle(a, c, d, rgba);
         }
 
-        Face(0, 1, 2, 3); // -Z
-        Face(4, 7, 6, 5); // +Z
-        Face(0, 4, 5, 1); // -Y
-        Face(3, 2, 6, 7); // +Y
-        Face(0, 3, 7, 4); // -X
-        Face(1, 5, 6, 2); // +X
+        Face(c0, c1, c2, c3); // -Z
+        Face(c4, c7, c6, c5); // +Z
+        Face(c0, c4, c5, c1); // -Y
+        Face(c3, c2, c6, c7); // +Y
+        Face(c0, c3, c7, c4); // -X
+        Face(c1, c5, c6, c2); // +X
     }
 
     /// <summary>Wire edges of an oriented box (same local frame as <see cref="DrawOrientedBox"/>).</summary>
@@ -68,19 +67,18 @@ public sealed class SilkCadWorld
         var hx = MathF.Abs(localHalfExtents.X);
         var hy = MathF.Abs(localHalfExtents.Y);
         var hz = MathF.Abs(localHalfExtents.Z);
-        Span<Vector3> p = stackalloc Vector3[8];
-        p[0] = center + Vector3.Transform(new Vector3(-hx, -hy, -hz), rotation);
-        p[1] = center + Vector3.Transform(new Vector3(+hx, -hy, -hz), rotation);
-        p[2] = center + Vector3.Transform(new Vector3(+hx, +hy, -hz), rotation);
-        p[3] = center + Vector3.Transform(new Vector3(-hx, +hy, -hz), rotation);
-        p[4] = center + Vector3.Transform(new Vector3(-hx, -hy, +hz), rotation);
-        p[5] = center + Vector3.Transform(new Vector3(+hx, -hy, +hz), rotation);
-        p[6] = center + Vector3.Transform(new Vector3(+hx, +hy, +hz), rotation);
-        p[7] = center + Vector3.Transform(new Vector3(-hx, +hy, +hz), rotation);
-        void Edge(int a, int b) => _batch.Line(p[a], p[b], c);
-        Edge(0, 1); Edge(1, 2); Edge(2, 3); Edge(3, 0);
-        Edge(4, 5); Edge(5, 6); Edge(6, 7); Edge(7, 4);
-        Edge(0, 4); Edge(1, 5); Edge(2, 6); Edge(3, 7);
+        var c0 = center + Vector3.Transform(new Vector3(-hx, -hy, -hz), rotation);
+        var c1 = center + Vector3.Transform(new Vector3(+hx, -hy, -hz), rotation);
+        var c2 = center + Vector3.Transform(new Vector3(+hx, +hy, -hz), rotation);
+        var c3 = center + Vector3.Transform(new Vector3(-hx, +hy, -hz), rotation);
+        var c4 = center + Vector3.Transform(new Vector3(-hx, -hy, +hz), rotation);
+        var c5 = center + Vector3.Transform(new Vector3(+hx, -hy, +hz), rotation);
+        var c6 = center + Vector3.Transform(new Vector3(+hx, +hy, +hz), rotation);
+        var c7 = center + Vector3.Transform(new Vector3(-hx, +hy, +hz), rotation);
+        void Edge(Vector3 a, Vector3 b) => _batch.Line(a, b, c);
+        Edge(c0, c1); Edge(c1, c2); Edge(c2, c3); Edge(c3, c0);
+        Edge(c4, c5); Edge(c5, c6); Edge(c6, c7); Edge(c7, c4);
+        Edge(c0, c4); Edge(c1, c5); Edge(c2, c6); Edge(c3, c7);
     }
 
     /// <summary>Queues a solid sphere approximation.</summary>

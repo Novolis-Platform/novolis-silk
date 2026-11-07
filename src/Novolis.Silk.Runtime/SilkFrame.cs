@@ -110,9 +110,12 @@ public sealed class SilkFrame
     public WorldLineGpuMesh CreateWorldLineMesh(ReadOnlySpan<WorldLineVertex> vertices) =>
         Host.CreateWorldLineMesh(vertices);
 
-    /// <summary>Draws a GPU-resident world-line mesh (no per-frame upload).</summary>
-    public void DrawWorldLineMesh(WorldLineGpuMesh mesh, in Matrix4x4 viewProjection) =>
-        Host.DrawWorldLineMesh(mesh, viewProjection);
+    /// <summary>
+    /// Draws a GPU-resident world-line mesh (no per-frame upload).
+    /// Pass <paramref name="depthTest"/> false for overlays (roads) that must not be buried by terrain.
+    /// </summary>
+    public void DrawWorldLineMesh(WorldLineGpuMesh mesh, in Matrix4x4 viewProjection, bool depthTest = true) =>
+        Host.DrawWorldLineMesh(mesh, viewProjection, depthTest);
 
     /// <summary>Draws world-space triangles with a view-projection matrix.</summary>
     public void DrawWorldTriangles(ReadOnlySpan<WorldSolidVertex> vertices, in Matrix4x4 viewProjection) =>

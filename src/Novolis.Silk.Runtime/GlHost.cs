@@ -305,8 +305,12 @@ public sealed class GlHost : IDisposable
         return new WorldLineGpuMesh(_gl, vao, vbo, count);
     }
 
-    /// <summary>Draws a previously uploaded <see cref="WorldLineGpuMesh"/> (no CPU→GPU copy).</summary>
-    public void DrawWorldLineMesh(WorldLineGpuMesh mesh, in Matrix4x4 viewProjection)
+    /// <summary>
+    /// Draws a previously uploaded <see cref="WorldLineGpuMesh"/> (no CPU→GPU copy).
+    /// Pass <paramref name="depthTest"/> false for map overlays (roads) that must stay
+    /// visible over a solid heightfield.
+    /// </summary>
+    public void DrawWorldLineMesh(WorldLineGpuMesh mesh, in Matrix4x4 viewProjection, bool depthTest = true)
     {
         ArgumentNullException.ThrowIfNull(mesh);
         if (mesh.VertexCount < 2)
@@ -314,7 +318,19 @@ public sealed class GlHost : IDisposable
 
         EnsureInitialized();
         BindWorldLineState();
+        if (!depthTest)
+        {
+            _gl.Disable(EnableCap.DepthTest);
+            _gl.DepthMask(false);
+        }
+
         mesh.Draw(_worldLineProgram, _worldLineMvpLocation, viewProjection);
+
+        if (!depthTest)
+        {
+            _gl.DepthMask(true);
+            _gl.Enable(EnableCap.DepthTest);
+        }
     }
 
     /// <summary>
