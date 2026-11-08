@@ -113,6 +113,9 @@ public enum Key
     /// <summary>Enter / return.</summary>
     Enter = 257,
 
+    /// <summary>Tab.</summary>
+    Tab = 258,
+
     /// <summary>Arrow right.</summary>
     Right = 262,
 
