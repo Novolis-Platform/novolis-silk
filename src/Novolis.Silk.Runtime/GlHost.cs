@@ -581,6 +581,14 @@ public sealed class GlHost : IDisposable
         }
 
         _gpuTextures.Clear();
+        if (_overlayTexture2 != 0)
+        {
+            _overlayTexture2Width = 0;
+            _overlayTexture2Height = 0;
+            _gl.DeleteTexture(_overlayTexture2);
+            _overlayTexture2 = 0;
+        }
+
         if (_blitTexture != 0)
         {
             _blitTextureWidth = 0;
