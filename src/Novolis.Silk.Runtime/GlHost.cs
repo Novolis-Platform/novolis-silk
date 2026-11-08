@@ -120,6 +120,12 @@ public sealed class GlHost : IDisposable
     private uint _blitVao;
     private uint _blitVbo;
     private uint _blitTexture;
+    private int _blitTextureWidth;
+    private int _blitTextureHeight;
+    private uint _overlayTexture2;
+    private int _overlayTexture2Width;
+    private int _overlayTexture2Height;
+    private int _blitSamplerLocation = -1;
     private uint _worldLineVao;
     private uint _worldLineVbo;
     private uint _worldSolidVao;
@@ -216,14 +222,29 @@ public sealed class GlHost : IDisposable
 
     /// <summary>Uploads a CPU RGBA frame as a full-window blit (replaces color buffer).</summary>
     public void Blit(ReadOnlySpan<Rgba32> pixels, int width, int height) =>
-        BlitCore(pixels, width, height, blend: false);
+        BlitCore(pixels, width, height, blend: false, upload: true, slot: 0);
 
     /// <summary>
     /// Alpha-composites a CPU RGBA frame over the current color buffer (HUD overlay).
     /// Transparent pixels leave the 3D scene visible.
     /// </summary>
     public void BlitOverlay(ReadOnlySpan<Rgba32> pixels, int width, int height) =>
-        BlitCore(pixels, width, height, blend: true);
+        BlitCore(pixels, width, height, blend: true, upload: true, slot: 0);
+
+    /// <summary>
+    /// Redraws the last uploaded overlay texture without a CPU→GPU pixel upload.
+    /// Use after <see cref="BlitOverlay"/> when the HUD bitmap is unchanged.
+    /// </summary>
+    public void DrawOverlay() =>
+        BlitCore(ReadOnlySpan<Rgba32>.Empty, _blitTextureWidth, _blitTextureHeight, blend: true, upload: false, slot: 0);
+
+    /// <summary>Second overlay slot (e.g. F1 profile) — does not clobber the HUD texture.</summary>
+    public void BlitOverlay2(ReadOnlySpan<Rgba32> pixels, int width, int height) =>
+        BlitCore(pixels, width, height, blend: true, upload: true, slot: 1);
+
+    /// <summary>Redraws overlay slot 2 without upload.</summary>
+    public void DrawOverlay2() =>
+        BlitCore(ReadOnlySpan<Rgba32>.Empty, _overlayTexture2Width, _overlayTexture2Height, blend: true, upload: false, slot: 1);
 
     /// <summary>
     /// Fullscreen cinematic grade: vignette, warm/cool sky bias, subtle grain.
@@ -247,11 +268,24 @@ public sealed class GlHost : IDisposable
         _gl.BindVertexArray(0);
     }
 
-    private void BlitCore(ReadOnlySpan<Rgba32> pixels, int width, int height, bool blend)
+    private void BlitCore(ReadOnlySpan<Rgba32> pixels, int width, int height, bool blend, bool upload, int slot)
     {
         EnsureInitialized();
+        if (width <= 0 || height <= 0)
+            return;
+
         Resize(width, height);
-        EnsureBlitTexture(pixels, width, height);
+        if (upload)
+        {
+            if (pixels.Length < width * height)
+                throw new ArgumentException("Overlay pixel buffer is smaller than width*height.", nameof(pixels));
+            EnsureBlitTexture(pixels, width, height, slot);
+        }
+        else if (!OverlayReady(slot, width, height))
+        {
+            return;
+        }
+
         if (blend)
         {
             _gl.Enable(EnableCap.Blend);
@@ -265,12 +299,19 @@ public sealed class GlHost : IDisposable
         _gl.Disable(EnableCap.DepthTest);
         _gl.UseProgram(_blitProgram);
         _gl.ActiveTexture(TextureUnit.Texture0);
-        _gl.BindTexture(TextureTarget.Texture2D, _blitTexture);
-        _gl.Uniform1(_gl.GetUniformLocation(_blitProgram, "uTexture"), 0);
+        _gl.BindTexture(TextureTarget.Texture2D, slot == 0 ? _blitTexture : _overlayTexture2);
+        if (_blitSamplerLocation < 0)
+            _blitSamplerLocation = _gl.GetUniformLocation(_blitProgram, "uTexture");
+        _gl.Uniform1(_blitSamplerLocation, 0);
         _gl.BindVertexArray(_blitVao);
         _gl.DrawArrays(PrimitiveType.Triangles, 0, 6);
         _gl.BindVertexArray(0);
     }
+
+    private bool OverlayReady(int slot, int width, int height) =>
+        slot == 0
+            ? _blitTexture != 0 && _blitTextureWidth == width && _blitTextureHeight == height
+            : _overlayTexture2 != 0 && _overlayTexture2Width == width && _overlayTexture2Height == height;
 
     /// <summary>Clears the color (and optional depth) buffer.</summary>
     public void Clear(Rgba32 color, bool depth = true)
@@ -542,6 +583,8 @@ public sealed class GlHost : IDisposable
         _gpuTextures.Clear();
         if (_blitTexture != 0)
         {
+            _blitTextureWidth = 0;
+            _blitTextureHeight = 0;
             _gl.DeleteTexture(_blitTexture);
         }
 
@@ -724,40 +767,54 @@ public sealed class GlHost : IDisposable
         _gpuTextures[blob.Id] = glTex;
     }
 
-    private void EnsureBlitTexture(ReadOnlySpan<Rgba32> pixels, int width, int height)
+    private void EnsureBlitTexture(ReadOnlySpan<Rgba32> pixels, int width, int height, int slot)
     {
-        if (_blitTexture == 0)
-        {
-            _blitTexture = _gl.GenTexture();
-        }
+        ref var texture = ref (slot == 0 ? ref _blitTexture : ref _overlayTexture2);
+        ref var texW = ref (slot == 0 ? ref _blitTextureWidth : ref _overlayTexture2Width);
+        ref var texH = ref (slot == 0 ? ref _blitTextureHeight : ref _overlayTexture2Height);
 
-        var bytes = new byte[width * height * 4];
-        var i = 0;
-        foreach (var p in pixels)
-        {
-            bytes[i++] = p.R;
-            bytes[i++] = p.G;
-            bytes[i++] = p.B;
-            bytes[i++] = p.A;
-        }
+        if (texture == 0)
+            texture = _gl.GenTexture();
 
-        _gl.BindTexture(TextureTarget.Texture2D, _blitTexture);
-        _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)GLEnum.Linear);
-        _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)GLEnum.Linear);
+        _gl.BindTexture(TextureTarget.Texture2D, texture);
+        _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)GLEnum.Nearest);
+        _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)GLEnum.Nearest);
+
+        // Rgba32 is four sequential bytes — upload without an intermediate heap copy.
+        ref var head = ref MemoryMarshal.GetReference(pixels);
         unsafe
         {
-            fixed (byte* ptr = bytes)
+            fixed (Rgba32* src = &head)
             {
-                _gl.TexImage2D(
-                    TextureTarget.Texture2D,
-                    0,
-                    InternalFormat.Rgba,
-                    (uint)width,
-                    (uint)height,
-                    0,
-                    PixelFormat.Rgba,
-                    PixelType.UnsignedByte,
-                    ptr);
+                var ptr = (byte*)src;
+                if (texW != width || texH != height)
+                {
+                    _gl.TexImage2D(
+                        TextureTarget.Texture2D,
+                        0,
+                        InternalFormat.Rgba,
+                        (uint)width,
+                        (uint)height,
+                        0,
+                        PixelFormat.Rgba,
+                        PixelType.UnsignedByte,
+                        ptr);
+                    texW = width;
+                    texH = height;
+                }
+                else
+                {
+                    _gl.TexSubImage2D(
+                        TextureTarget.Texture2D,
+                        0,
+                        0,
+                        0,
+                        (uint)width,
+                        (uint)height,
+                        PixelFormat.Rgba,
+                        PixelType.UnsignedByte,
+                        ptr);
+                }
             }
         }
     }

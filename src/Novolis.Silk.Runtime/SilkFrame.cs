@@ -131,6 +131,9 @@ public sealed class SilkFrame
     public void BlitOverlay(ReadOnlySpan<Rgba32> pixels, int width, int height) =>
         Host.BlitOverlay(pixels, width, height);
 
+    /// <summary>Redraws the last HUD overlay texture with no CPU upload.</summary>
+    public void DrawOverlay() => Host.DrawOverlay();
+
     /// <summary>Fullscreen cinematic grade overlay (vignette / warm-cool / grain).</summary>
     public void DrawScreenGrade(float timeSeconds, float intensity = 1f) =>
         Host.DrawScreenGrade(timeSeconds, intensity);
