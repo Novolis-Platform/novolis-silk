@@ -130,6 +130,9 @@ public sealed class SilkFrame
     /// </summary>
     public void Blit(ReadOnlySpan<Rgba32> pixels, int width, int height) => Host.Blit(pixels, width, height);
 
+    /// <summary>Redraws the last <see cref="Blit"/> texture without re-uploading pixels.</summary>
+    public void RedrawBlit() => Host.RedrawBlit();
+
     /// <summary>Alpha-composites CPU RGBA pixels over the current frame (HUD overlay).</summary>
     public void BlitOverlay(ReadOnlySpan<Rgba32> pixels, int width, int height) =>
         Host.BlitOverlay(pixels, width, height);

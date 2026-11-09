@@ -225,6 +225,13 @@ public sealed class GlHost : IDisposable
         BlitCore(pixels, width, height, blend: false, upload: true, slot: 0);
 
     /// <summary>
+    /// Redraws the last <see cref="Blit"/> texture without a CPU→GPU pixel upload.
+    /// Use when the path-trace frame is unchanged between window swaps.
+    /// </summary>
+    public void RedrawBlit() =>
+        BlitCore(ReadOnlySpan<Rgba32>.Empty, _blitTextureWidth, _blitTextureHeight, blend: false, upload: false, slot: 0);
+
+    /// <summary>
     /// Alpha-composites a CPU RGBA frame over the current color buffer (HUD overlay).
     /// Transparent pixels leave the 3D scene visible.
     /// </summary>
