@@ -122,6 +122,8 @@ public sealed class GlHost : IDisposable
     private uint _blitTexture;
     private int _blitTextureWidth;
     private int _blitTextureHeight;
+    private uint _blitPbo;
+    private int _blitPboBytes;
     private uint _overlayTexture2;
     private int _overlayTexture2Width;
     private int _overlayTexture2Height;
@@ -607,6 +609,13 @@ public sealed class GlHost : IDisposable
             _gl.DeleteTexture(_blitTexture);
         }
 
+        if (_blitPbo != 0)
+        {
+            _gl.DeleteBuffer(_blitPbo);
+            _blitPbo = 0;
+            _blitPboBytes = 0;
+        }
+
         _gl.DeleteBuffer(_vbo);
         _gl.DeleteVertexArray(_vao);
         _gl.DeleteProgram(_program);
@@ -799,7 +808,14 @@ public sealed class GlHost : IDisposable
         _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)GLEnum.Nearest);
         _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)GLEnum.Nearest);
 
-        // Rgba32 is four sequential bytes — upload without an intermediate heap copy.
+        // Slot 0 (path-trace present): PBO orphan+map so the driver can DMA without stalling on the
+        // previous TexSubImage — classic buffer-streaming (Molly Rocket / Computer Enhance style).
+        if (slot == 0)
+        {
+            UploadBlitViaPbo(pixels, width, height, ref texW, ref texH);
+            return;
+        }
+
         ref var head = ref MemoryMarshal.GetReference(pixels);
         unsafe
         {
@@ -836,6 +852,67 @@ public sealed class GlHost : IDisposable
                 }
             }
         }
+    }
+
+    private unsafe void UploadBlitViaPbo(ReadOnlySpan<Rgba32> pixels, int width, int height, ref int texW, ref int texH)
+    {
+        var bytes = width * height * 4;
+        if (_blitPbo == 0)
+            _blitPbo = _gl.GenBuffer();
+
+        _gl.BindBuffer(BufferTargetARB.PixelUnpackBuffer, _blitPbo);
+        if (_blitPboBytes != bytes)
+        {
+            // Orphan / resize.
+            _gl.BufferData(BufferTargetARB.PixelUnpackBuffer, (nuint)bytes, null, BufferUsageARB.StreamDraw);
+            _blitPboBytes = bytes;
+        }
+        else
+        {
+            // Orphan the previous backing store so MapBuffer does not sync against in-flight DMA.
+            _gl.BufferData(BufferTargetARB.PixelUnpackBuffer, (nuint)bytes, null, BufferUsageARB.StreamDraw);
+        }
+
+        var mapped = _gl.MapBuffer(BufferTargetARB.PixelUnpackBuffer, BufferAccessARB.WriteOnly);
+        if (mapped is not null)
+        {
+            ref var head = ref MemoryMarshal.GetReference(pixels);
+            fixed (Rgba32* src = &head)
+            {
+                System.Buffer.MemoryCopy(src, mapped, bytes, bytes);
+            }
+
+            _ = _gl.UnmapBuffer(BufferTargetARB.PixelUnpackBuffer);
+        }
+
+        if (texW != width || texH != height)
+        {
+            _gl.TexImage2D(
+                TextureTarget.Texture2D,
+                0,
+                InternalFormat.Rgba,
+                (uint)width,
+                (uint)height,
+                0,
+                PixelFormat.Rgba,
+                PixelType.UnsignedByte,
+                (void*)null);
+            texW = width;
+            texH = height;
+        }
+
+        // Offset 0 into the bound PBO.
+        _gl.TexSubImage2D(
+            TextureTarget.Texture2D,
+            0,
+            0,
+            0,
+            (uint)width,
+            (uint)height,
+            PixelFormat.Rgba,
+            PixelType.UnsignedByte,
+            (void*)null);
+        _gl.BindBuffer(BufferTargetARB.PixelUnpackBuffer, 0);
     }
 
     private void BindWorldLineState()
