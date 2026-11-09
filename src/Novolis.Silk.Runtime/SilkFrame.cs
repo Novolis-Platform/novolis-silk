@@ -20,6 +20,8 @@ public sealed class SilkFrame
     private Vector2 _mousePosition;
     private Vector2 _mouseDelta;
     private float _scrollDelta;
+    private float _scrollAccum;
+    private bool _mousePrimed;
     private int _width;
     private int _height;
     private float _dt;
@@ -64,13 +66,31 @@ public sealed class SilkFrame
         _window = window;
         _host = host;
         _input = input;
+        _mousePrimed = false;
+        _scrollAccum = 0f;
+        _scrollDelta = 0f;
+        foreach (var mouse in input.Mice)
+        {
+            mouse.Scroll += OnMouseScroll;
+        }
     }
 
     internal void Unbind()
     {
+        if (_input is not null)
+        {
+            foreach (var mouse in _input.Mice)
+            {
+                mouse.Scroll -= OnMouseScroll;
+            }
+        }
+
         _window = null;
         _host = null;
         _input = null;
+        _mousePrimed = false;
+        _scrollAccum = 0f;
+        _scrollDelta = 0f;
     }
 
     internal void SetFrame(Vector2D<int> size, float deltaSeconds)
@@ -296,10 +316,16 @@ public sealed class SilkFrame
         _mousePolledThisFrame.Clear();
     }
 
+    private void OnMouseScroll(SilkInput.IMouse mouse, SilkInput.ScrollWheel wheel) =>
+        _scrollAccum += wheel.Y;
+
     private void PollMouse()
     {
         _mouseDelta = Vector2.Zero;
-        _scrollDelta = 0f;
+        // Consume event-accumulated scroll. Polling ScrollWheels.Y every frame can stick and
+        // look like a continuous zoom "event", keeping interactive hosts at 1 spp forever.
+        _scrollDelta = _scrollAccum;
+        _scrollAccum = 0f;
         var windowSize = _window?.Size ?? new Vector2D<int>(_width, _height);
         var scaleX = windowSize.X > 0 ? _width / (float)windowSize.X : 1f;
         var scaleY = windowSize.Y > 0 ? _height / (float)windowSize.Y : 1f;
@@ -307,11 +333,15 @@ public sealed class SilkFrame
         {
             var p = mouse.Position;
             var pos = new Vector2(p.X * scaleX, p.Y * scaleY);
-            _mouseDelta += pos - _mousePosition;
-            _mousePosition = pos;
-            foreach (var scroll in mouse.ScrollWheels)
+            if (!_mousePrimed)
             {
-                _scrollDelta += scroll.Y;
+                _mousePosition = pos;
+                _mousePrimed = true;
+            }
+            else
+            {
+                _mouseDelta += pos - _mousePosition;
+                _mousePosition = pos;
             }
         }
     }
