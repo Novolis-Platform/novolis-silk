@@ -274,7 +274,11 @@ public sealed class GlHost : IDisposable
         if (width <= 0 || height <= 0)
             return;
 
-        Resize(width, height);
+        // Stretch the texture across the current window viewport. Do not Resize() to the
+        // texture size — that pinned smaller path-trace frames in the bottom-left corner.
+        if (_viewportWidth < 1 || _viewportHeight < 1)
+            Resize(width, height);
+
         if (upload)
         {
             if (pixels.Length < width * height)

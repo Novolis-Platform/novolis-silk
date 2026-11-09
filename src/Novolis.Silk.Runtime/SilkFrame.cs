@@ -124,7 +124,10 @@ public sealed class SilkFrame
     /// <summary>Draws a tessellated planar frame.</summary>
     public void Submit(PlanarDrawList list) => Host.Submit(list);
 
-    /// <summary>Blits CPU RGBA pixels to the window (replaces color buffer).</summary>
+    /// <summary>
+    /// Blits CPU RGBA pixels to the window (replaces color buffer).
+    /// Texture size may differ from <see cref="Width"/>×<see cref="Height"/>; the image is stretched to fill the framebuffer.
+    /// </summary>
     public void Blit(ReadOnlySpan<Rgba32> pixels, int width, int height) => Host.Blit(pixels, width, height);
 
     /// <summary>Alpha-composites CPU RGBA pixels over the current frame (HUD overlay).</summary>
