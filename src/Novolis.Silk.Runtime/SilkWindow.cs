@@ -25,7 +25,21 @@ public static class SilkWindow
         int height,
         Action<SilkFrame>? initialize,
         Action<SilkFrame> update,
-        bool visible)
+        bool visible) =>
+        Run(title, width, height, initialize, update, visible, vsync: visible);
+
+    /// <summary>
+    /// Runs a GLFW/OpenGL loop.
+    /// Pass <paramref name="vsync"/> false for uncapped interactive hosts (path-trace studios).
+    /// </summary>
+    public static void Run(
+        string title,
+        int width,
+        int height,
+        Action<SilkFrame>? initialize,
+        Action<SilkFrame> update,
+        bool visible,
+        bool vsync)
     {
         ArgumentNullException.ThrowIfNull(update);
         var options = WindowOptions.Default with
@@ -38,7 +52,7 @@ public static class SilkWindow
                 ContextProfile.Core,
                 ContextFlags.ForwardCompatible,
                 new APIVersion(3, 3)),
-            VSync = visible,
+            VSync = vsync,
         };
 
         GlfwWindowing.RegisterPlatform();
