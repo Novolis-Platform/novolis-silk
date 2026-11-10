@@ -10,6 +10,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- GL/packing kernels are a poor fit for NOV2301 advisory heuristics. -->
+    <NovolisReadabilityComplexity>false</NovolisReadabilityComplexity>
     <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1504;NU1507;NU1510;NU1603;NU1605;NU1608;NU1901;NU1902;NU1903;NU1904;NU1701</WarningsNotAsErrors>
     <Authors>Novolis</Authors>
     <Company>Novolis</Company>
